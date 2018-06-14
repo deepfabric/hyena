@@ -1,0 +1,56 @@
+syntax = "proto2";
+package meta;
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_enum_prefix_all) = false;
+
+// StoreState store state
+enum StoreState {
+    UP        = 0;
+    Down      = 1;
+    Tombstone = 2;
+}
+
+// DBState db state
+enum DBState {
+    // RU read and update
+    RU  = 0;
+    // RWU read, append write and update
+    RWU = 1;
+}
+
+message Label {
+    optional string key   = 1 [(gogoproto.nullable) = false];
+    optional string value = 2 [(gogoproto.nullable) = false];
+}
+
+message Peer {
+    optional uint64 id      = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional uint64 storeID = 2 [(gogoproto.nullable) = false];
+}
+
+message Epoch {
+    optional uint64 version     = 1 [(gogoproto.nullable) = false];
+    optional uint64 confVersion = 2 [(gogoproto.nullable) = false];
+}
+
+// VectorDB is a vectorDB
+message VectorDB {
+    optional uint64  id    = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional DBState state = 2 [(gogoproto.nullable) = false];
+    optional Epoch   epoch = 4 [(gogoproto.nullable) = false];
+    repeated Peer    peers = 5 [(gogoproto.nullable) = true];
+}
+
+// Store container of vectordb
+message Store {
+    optional uint64     id            = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional string     address       = 2 [(gogoproto.nullable) = false];
+    optional string     clientAddress = 3 [(gogoproto.nullable) = false];
+    repeated Label      lables        = 4 [(gogoproto.nullable) = false];
+    optional StoreState state         = 5 [(gogoproto.nullable) = false];
+}

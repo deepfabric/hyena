@@ -1,0 +1,56 @@
+syntax = "proto2";
+package rpc;
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_enum_prefix_all) = false;
+
+// MsgType msg type
+enum MsgType {
+    MsgSearchReq = 0;
+    MsgSearchRsp = 1;
+    MsgInsertReq = 2;
+    MsgInsertRsp = 3;
+    MsgUpdateReq = 4;
+    MsgUpdateRsp = 5;
+    MsgAdmin     = 6;
+}
+
+// SearchRequest search request
+message SearchRequest {
+    optional bytes  id = 1 [(gogoproto.customname) = "ID"];
+    optional uint64 db = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+}
+
+// SearchResponse search response
+message SearchResponse {
+    optional bytes id = 1 [(gogoproto.customname) = "ID"];
+}
+
+// InsertRequest insert request
+message InsertRequest {
+    optional bytes id  = 1 [(gogoproto.customname) = "ID"];
+    repeated float xbs = 2;
+    repeated int64 ids = 3;
+}
+
+// InsertResponse insert response
+message InsertResponse {
+    optional bytes id = 1 [(gogoproto.customname) = "ID"];
+}
+
+// UpdateRequest insert request
+message UpdateRequest {
+    optional bytes  id  = 1 [(gogoproto.customname) = "ID"];
+    optional uint64 db  = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+    repeated float  xbs = 3;
+    repeated int64  ids = 4;
+}
+
+// UpdateResponse update response
+message UpdateResponse {
+    optional bytes id = 1 [(gogoproto.customname) = "ID"];
+}

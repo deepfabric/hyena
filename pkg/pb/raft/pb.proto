@@ -1,0 +1,193 @@
+syntax = "proto2";
+package raft;
+
+import "pb/rpc/pb.proto";
+import "pb/meta/pb.proto";
+import "gogoproto/gogo.proto";
+import "github.com/coreos/etcd/raft/raftpb/raft.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_enum_prefix_all) = false;
+
+// PeerState peer state
+enum PeerState {
+    Normal    = 0;
+    Applying  = 1;
+    Tombstone = 2;
+}
+
+// DBLocalState vectordb local state
+message DBLocalState {
+    optional PeerState     state = 1 [(gogoproto.nullable) = false];
+    optional meta.VectorDB db    = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+}
+
+// RaftLocalState raft local state
+message RaftLocalState {
+    optional raftpb.HardState hardState = 1 [(gogoproto.nullable) = false];
+    optional uint64           lastIndex = 2 [(gogoproto.nullable) = false];
+}
+
+// RaftApplyState raft apply state
+message RaftApplyState {
+    optional uint64             appliedIndex   = 1 [(gogoproto.nullable) = false];
+    optional RaftTruncatedState truncatedState = 2 [(gogoproto.nullable) = false];
+}
+
+// RaftTruncatedState raft snapshot state
+message RaftTruncatedState {
+    optional uint64 index = 1 [(gogoproto.nullable) = false];
+    optional uint64 term  = 2 [(gogoproto.nullable) = false];
+}
+
+// RaftMessage wrapper etcd raft msg for multi-raft
+message RaftMessage  {
+    optional uint64         id        = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional meta.Peer      from      = 2 [(gogoproto.nullable) = false];
+    optional meta.Peer      to        = 3 [(gogoproto.nullable) = false];
+    optional meta.Epoch     epoch     = 4 [(gogoproto.nullable) = false];
+    optional bool           tombstone = 5 [(gogoproto.nullable) = false];
+    optional raftpb.Message message   = 6 [(gogoproto.nullable) = false];
+}
+
+// SnapshotMessageHeader snapshot header
+message SnapshotMessageHeader {
+    optional meta.VectorDB db    = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+    optional meta.Peer     from  = 2 [(gogoproto.nullable) = false];
+    optional meta.Peer     to    = 3 [(gogoproto.nullable) = false];
+    optional uint64        term  = 4 [(gogoproto.nullable) = false];
+    optional uint64        index = 5 [(gogoproto.nullable) = false];
+    optional uint64        seq   = 6 [(gogoproto.nullable) = false];
+}
+
+// SnapshotMessage message
+message SnapshotMessage {
+    optional SnapshotMessageHeader header = 1 [(gogoproto.nullable) = false];
+    optional SnapshotChunkMessage  chunk  = 2;
+}
+
+// SnapshotChunkMessage chunk message
+message SnapshotChunkMessage {
+    optional bytes  data     = 1;
+    optional bool   first    = 2 [(gogoproto.nullable) = false];
+    optional bool   last     = 3 [(gogoproto.nullable) = false];
+    optional uint64 fileSize = 4 [(gogoproto.nullable) = false];
+    optional uint64 checkSum = 5 [(gogoproto.nullable) = false];
+}
+
+// AdminCmdType raft cmd type
+enum AdminCmdType {
+    ChangePeer     = 0;
+    Split          = 1;
+    CompactLog     = 2;
+    TransferLeader = 3;
+}
+
+message RaftRequestHeader {
+    optional uint64     id    = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional bytes      uuid  = 2 [(gogoproto.customname) = "UUID"];
+    optional meta.Peer  peer  = 3 [(gogoproto.nullable) = false];
+    optional meta.Epoch epoch = 4 [(gogoproto.nullable) = false];
+    optional uint64     term  = 5 [(gogoproto.nullable) = false];
+}
+
+// RaftCMDRequest we can't include both normal requests and administrator request 
+// at same time. 
+message RaftCMDRequest {
+    optional RaftRequestHeader header  = 1 [(gogoproto.nullable) = false];
+    repeated rpc.InsertRequest inserts = 2;
+    repeated rpc.UpdateRequest updates = 3;
+    optional AdminRequest      admin   = 4;
+}
+
+message AdminRequest {
+    optional AdminCmdType type                    = 1 [(gogoproto.nullable) = false];
+    optional ChangePeerRequest     changePeer     = 2;
+    optional SplitRequest          split          = 3;
+    optional TransferLeaderRequest transferLeader = 4;
+    optional CompactLogRequest     compactLog     = 5;
+}
+
+message AdminResponse {
+    optional AdminCmdType           type           = 1 [(gogoproto.nullable) = false];
+    optional ChangePeerResponse     changePeer     = 2;
+    optional SplitResponse          split          = 3;
+    optional TransferLeaderResponse transferLeader = 4;
+    optional CompactLogResponse     compactLog     = 5;
+}
+
+message ChangePeerRequest {
+    optional raftpb.ConfChangeType changeType = 1 [(gogoproto.nullable) = false];
+    optional meta.Peer             peer       = 2 [(gogoproto.nullable) = false];
+}
+
+message ChangePeerResponse {
+    optional meta.VectorDB db = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+}
+
+message SplitRequest {
+    // We split the cell into two, first uses the origin 
+    // parent db id, and the second uses the newID.
+    // We must guarantee that the newID is global unique.
+    optional uint64 newID      = 1 [(gogoproto.nullable) = false];
+    // The peer ids for the new split cell.
+    repeated uint64 newPeerIDs = 2;
+}
+
+message SplitResponse {
+    optional meta.VectorDB oldDB = 1 [(gogoproto.nullable) = false];
+    optional meta.VectorDB newDB = 2 [(gogoproto.nullable) = false];
+}
+
+message TransferLeaderRequest {
+    optional meta.Peer peer = 1 [(gogoproto.nullable) = false];
+}
+
+message TransferLeaderResponse {
+}
+
+message CompactLogRequest {
+    optional uint64 compactIndex = 1 [(gogoproto.nullable) = false];
+    optional uint64 compactTerm  = 2 [(gogoproto.nullable) = false];
+}
+
+message CompactLogResponse {
+    
+}
+
+message NotLeader {
+    optional uint64    id     = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional meta.Peer leader = 2 [(gogoproto.nullable) = false];
+}
+
+message StoreNotMatch {}
+
+message ServerIsBusy {}
+
+message StaleCommand {}
+
+message DBNotFound {
+    optional uint64 id = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+}
+
+message StaleEpoch {
+    repeated meta.VectorDB newDBs = 1 [(gogoproto.nullable) = false];
+}
+
+message RaftEntryTooLarge {
+    optional uint64 id        = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional uint64 entrySize = 2 [(gogoproto.nullable) = false];
+}
+
+message Error {
+    optional string            message           = 1 [(gogoproto.nullable) = false];
+    optional NotLeader         notLeader         = 2;
+    optional DBNotFound        dbNotFound        = 3;
+    optional StaleEpoch        staleEpoch        = 4;
+    optional ServerIsBusy      serverIsBusy      = 5;
+    optional StaleCommand      staleCommand      = 6;
+    optional StoreNotMatch     storeNotMatch     = 7;
+    optional RaftEntryTooLarge raftEntryTooLarge = 8;
+}

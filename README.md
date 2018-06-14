@@ -1,2 +1,2 @@
-# hound
+# hyena
 Distributed vector searcher 
