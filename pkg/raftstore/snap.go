@@ -113,6 +113,7 @@ func newDefaultSnapshotManager(store *Store) SnapshotManager {
 	}()
 
 	return &defaultSnapshotManager{
+		dir:      dir,
 		store:    store,
 		limiter:  rate.NewLimiter(rate.Every(time.Second/time.Duration(store.cfg.LimitSnapChunkRate)), int(store.cfg.LimitSnapChunkRate)),
 		registry: make(map[string]struct{}),
@@ -346,22 +347,21 @@ func (m *defaultSnapshotManager) Apply(msg *raftpb.SnapshotMessage) error {
 	if !m.Exists(msg) {
 		return fmt.Errorf("missing snapshot file %s", file)
 	}
-
 	defer m.CleanSnap(msg)
 
-	err := util.UnGZIP(file, m.dir)
+	target := fmt.Sprintf("%s/%s", m.dir, formatKey(msg))
+	err := util.UnGZIP(file, target)
 	if err != nil {
 		return err
 	}
-	dir := m.getPathOfSnapKey(msg)
-	defer os.RemoveAll(dir)
+	defer os.RemoveAll(target)
 
 	pr := m.store.getDB(msg.Header.DB.ID, false)
 	if err != nil {
 		log.Fatalf("bug: missing peer for db %d", msg.Header.DB.ID)
 	}
 
-	return pr.ps.vdb.ApplySnap(dir)
+	return pr.ps.vdb.ApplySnap(fmt.Sprintf("%s/%d", target, msg.Header.DB.ID))
 }
 
 func (m *defaultSnapshotManager) cleanTmp(msg *raftpb.SnapshotMessage) error {

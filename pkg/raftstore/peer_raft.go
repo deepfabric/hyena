@@ -348,7 +348,7 @@ func (pr *PeerReplicate) handleReady() {
 	// If we continue to handle all the messages, it may cause too many messages because
 	// leader will send all the remaining messages to this follower, which can lead
 	// to full message queue under high load.
-	if !pr.ps.isApplySnapComplete() {
+	if pr.ps.isApplyingSnap() {
 		log.Infof("raftstore[db-%d]: still applying snapshot, skip further handling",
 			pr.id)
 		return
@@ -440,20 +440,19 @@ func (pr *PeerReplicate) handleRaftReadyAppend(ctx *readyContext, rd etcdraft.Re
 				pr.id,
 				err)
 		}
+	}
 
-		if ctx.raftState.LastIndex > 0 && !etcdraft.IsEmptyHardState(rd.HardState) {
-			ctx.raftState.HardState = rd.HardState
-		}
+	if ctx.raftState.LastIndex > 0 && !etcdraft.IsEmptyHardState(rd.HardState) {
+		ctx.raftState.HardState = rd.HardState
+	}
 
-		pr.doSaveRaftState(ctx)
-		pr.doSaveApplyState(ctx)
-
-		err = pr.store.metaStore.Write(ctx.wb, pr.store.cfg.SyncWrite)
-		if err != nil {
-			log.Fatalf("raftstore[db-%d]: handle raft ready failure, errors\n %+v",
-				pr.id,
-				err)
-		}
+	pr.doSaveRaftState(ctx)
+	pr.doSaveApplyState(ctx)
+	err := pr.store.metaStore.Write(ctx.wb, pr.store.cfg.SyncWrite)
+	if err != nil {
+		log.Fatalf("raftstore[db-%d]: handle raft ready failure, errors\n %+v",
+			pr.id,
+			err)
 	}
 }
 
@@ -483,7 +482,7 @@ func (pr *PeerReplicate) handleRaftReadyApply(ctx *readyContext, rd etcdraft.Rea
 }
 
 func (pr *PeerReplicate) handleApplyCommittedEntries(rd etcdraft.Ready) {
-	if !pr.ps.isApplySnapComplete() {
+	if pr.ps.isApplyingSnap() {
 		pr.ps.lastReadyIndex = pr.ps.truncatedIndex()
 	} else {
 		for _, entry := range rd.CommittedEntries {
@@ -859,7 +858,7 @@ func (pr *PeerReplicate) doSaveApplyState(ctx *readyContext) {
 	if readyState.AppliedIndex != origin.AppliedIndex ||
 		readyState.TruncatedState.Index != origin.TruncatedState.Index ||
 		readyState.TruncatedState.Term != origin.TruncatedState.Term {
-		err := ctx.wb.Set(getRaftApplyStateKey(pr.id), pbutil.MustMarshal(&ctx.applyState))
+		err := ctx.wb.Set(getRaftApplyStateKey(pr.id), pbutil.MustMarshal(&readyState))
 		if err != nil {
 			log.Fatalf("raftstore[db-%d]: handle raft ready failure, errors:\n %+v",
 				pr.id,
@@ -983,7 +982,7 @@ func (pr *PeerReplicate) doPollApply(result *asyncApplyResult) {
 }
 
 func (pr *PeerReplicate) doPostApply(result *asyncApplyResult) {
-	if !pr.ps.isApplySnapComplete() {
+	if pr.ps.isApplyingSnap() {
 		log.Fatalf("raftstore[db-%d]: should not applying snapshot, when do post apply.",
 			pr.id)
 	}

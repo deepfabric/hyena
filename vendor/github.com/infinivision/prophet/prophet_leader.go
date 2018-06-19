@@ -77,6 +77,7 @@ func (p *Prophet) enableLeader() {
 	// now, we are leader
 	atomic.StoreInt64(&p.leaderFlag, 1)
 	log.Infof("prophet: ********become to leader now********")
+	p.leader = p.node
 
 	p.rt = newRuntime(p.store)
 	p.rt.load()
@@ -87,9 +88,11 @@ func (p *Prophet) enableLeader() {
 }
 
 func (p *Prophet) disableLeader() {
-	log.Infof("prophet: ********become to follower now********")
-	// now, we are not leader
 	atomic.StoreInt64(&p.leaderFlag, 0)
+	log.Infof("prophet: ********become to follower now********")
+	p.leader = nil
+
+	// now, we are not leader
 	if p.coordinator != nil {
 		p.coordinator.stop()
 		p.rt = nil

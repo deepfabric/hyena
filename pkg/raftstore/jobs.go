@@ -192,7 +192,7 @@ func (ps *peerStorage) doGenSnapJob() error {
 	snapshot.Data = pbutil.MustMarshal(msg)
 	ps.genSnapJob.SetResult(snapshot)
 
-	log.Infof("raftstore[db-%d]: snapshot created, epoch is %d, term is %d index is %d, cost %s",
+	log.Infof("raftstore[db-%d]: snapshot created, epoch is %d, term is %d index is %d",
 		ps.db.ID,
 		msg.Header.DB.Epoch,
 		msg.Header.Term,

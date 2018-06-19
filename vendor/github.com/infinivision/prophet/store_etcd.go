@@ -368,8 +368,6 @@ func (s *etcdStore) PutBootstrapped(container Container, res Resource) (bool, er
 		return false, err
 	}
 
-	log.Infof("*************************************resp: %+v", resp)
-
 	// already bootstrapped
 	if !resp.Succeeded {
 		return false, nil

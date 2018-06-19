@@ -371,7 +371,7 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 		// current peer is stale, then we should remove current peer
 		if p.peer.ID < target.ID {
 			// cancel snapshotting op
-			if !p.ps.isApplySnapComplete() && !p.ps.cancelApplySnapJob() {
+			if p.ps.isApplyingSnap() && !p.ps.cancelApplySnapJob() {
 				log.Infof("raftstore[db-%d]: stale peer is applying snapshot, will destroy next time, peer=<%d>",
 					id,
 					p.peer.ID)
@@ -581,7 +581,7 @@ func (s *Store) destroyPeer(id uint64, target meta.Peer, async bool) {
 			log.Fatalf("raftstore[db-%d]: destroy db not exist", id)
 		}
 
-		if !pr.ps.isApplySnapComplete() {
+		if pr.ps.isApplyingSnap() {
 			log.Fatalf("raftstore[db-%d]: destroy db is apply for snapshot", id)
 		}
 
@@ -671,7 +671,7 @@ func (s *Store) getDBStatus() dbStatus {
 	s.replicates.Range(func(key, value interface{}) bool {
 		pr := value.(*PeerReplicate)
 		st.dbCount++
-		if !pr.ps.isApplySnapComplete() {
+		if pr.ps.isApplyingSnap() {
 			st.applyingSnapCount++
 		}
 

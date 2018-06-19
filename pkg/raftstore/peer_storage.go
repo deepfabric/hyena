@@ -323,12 +323,20 @@ func (ps *peerStorage) isApplyComplete() bool {
 }
 
 // ====================== about jobs
+func (ps *peerStorage) isApplyingSnap() bool {
+	return ps.applySnapJob != nil && ps.applySnapJob.IsNotComplete()
+}
+
 func (ps *peerStorage) isApplySnapComplete() bool {
-	return ps.applySnapJob == nil || ps.applySnapJob.IsComplete()
+	return ps.applySnapJob != nil && ps.applySnapJob.IsComplete()
+}
+
+func (ps *peerStorage) isGenSnapRunning() bool {
+	return ps.genSnapJob != nil && ps.genSnapJob.IsNotComplete()
 }
 
 func (ps *peerStorage) isGenSnapComplete() bool {
-	return ps.genSnapJob == nil || ps.genSnapJob.IsComplete()
+	return ps.genSnapJob != nil && ps.genSnapJob.IsComplete()
 }
 
 func (ps *peerStorage) setGenSnapJob(job *task.Job) {
@@ -509,7 +517,7 @@ func (ps *peerStorage) FirstIndex() (uint64, error) {
 }
 
 func (ps *peerStorage) Snapshot() (etcdraftpb.Snapshot, error) {
-	if !ps.isGenSnapComplete() {
+	if ps.isGenSnapRunning() {
 		return etcdraftpb.Snapshot{}, etcdraft.ErrSnapshotTemporarilyUnavailable
 	}
 

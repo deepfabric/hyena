@@ -133,12 +133,12 @@ func newContainerHeartbeatRsp() Serializable {
 }
 
 type errorRsp struct {
-	Err error `json:"err"`
+	Err string `json:"err"`
 }
 
 func newErrorRsp(err error) Serializable {
 	rsp := &errorRsp{}
-	rsp.Err = err
+	rsp.Err = err.Error()
 
 	return rsp
 }
