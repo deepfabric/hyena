@@ -24,7 +24,7 @@ const (
 
 var (
 	emptyStruct                         = struct{}{}
-	batch                        int64  = 1024
+	batch                        int64  = 64
 	maxTransferLeaderAllowLogLag uint64 = 10
 )
 
@@ -37,6 +37,10 @@ const (
 
 func (pr *PeerReplicate) isLeader() bool {
 	return pr.rn.Status().RaftState == etcdraft.StateLeader
+}
+
+func (pr *PeerReplicate) isWritable() bool {
+	return pr.ps.db.State == meta.RWU
 }
 
 func (pr *PeerReplicate) leaderPeerID() uint64 {
@@ -398,6 +402,11 @@ func (pr *PeerReplicate) handleReady() {
 				pr.id)
 			pr.store.pd.GetRPC().TiggerResourceHeartbeat(pr.id)
 			pr.resetBatching()
+		}
+
+		// now we are join in the raft group, bootstrap the mq consumer to process insert requests
+		if pr.isWritable() {
+			pr.maybeStartConsumer()
 		}
 	}
 
@@ -1099,10 +1108,13 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 
 	pr.ps.db = oldDB
 	pr.ps.inAsking = false
+
 	// add new cell peers to cache
 	for _, p := range newDB.Peers {
 		s.addPeerToCache(*p)
 	}
+
+	pr.maybeStopConsumer()
 
 	newDBID := newDB.ID
 	newPR := s.getDB(newDBID, false)

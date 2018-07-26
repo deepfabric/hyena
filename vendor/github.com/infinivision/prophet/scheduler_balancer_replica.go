@@ -66,8 +66,8 @@ func (s *balanceReplicaScheduler) Schedule(rt *Runtime) Operator {
 
 func (s *balanceReplicaScheduler) transferPeer(rt *Runtime, res *ResourceRuntime, oldPeer *Peer) Operator {
 	// scoreGuard guarantees that the distinct score will not decrease.
-	containers := rt.GetResourceContainers(res)
-	source := rt.GetContainer(oldPeer.ContainerID)
+	containers := rt.ResourceContainers(res)
+	source := rt.Container(oldPeer.ContainerID)
 	scoreGuard := NewDistinctScoreFilter(s.cfg, containers, source)
 
 	checker := newReplicaChecker(s.cfg, rt)
@@ -76,7 +76,7 @@ func (s *balanceReplicaScheduler) transferPeer(rt *Runtime, res *ResourceRuntime
 		return nil
 	}
 
-	target := rt.GetContainer(newPeer.ContainerID)
+	target := rt.Container(newPeer.ContainerID)
 	if !shouldBalance(source, target, s.ResourceKind()) {
 		return nil
 	}
@@ -87,7 +87,7 @@ func (s *balanceReplicaScheduler) transferPeer(rt *Runtime, res *ResourceRuntime
 
 // scheduleRemovePeer schedules a resource to remove the peer.
 func scheduleRemovePeer(rt *Runtime, s Selector, filters ...Filter) (*ResourceRuntime, *Peer) {
-	containers := rt.GetContainers()
+	containers := rt.Containers()
 
 	source := s.SelectSource(containers, filters...)
 	if source == nil {

@@ -237,3 +237,12 @@ func WithDistThr(value float32) Option {
 		opts.cfg.DistThr = value
 	}
 }
+
+// WithNSQ set nsq
+func WithNSQ(topic, channel string, nsqLookupURLs []string) Option {
+	return func(opts *options) {
+		opts.cfg.Topic = topic
+		opts.cfg.Channel = channel
+		opts.cfg.NSQLookupURLs = nsqLookupURLs
+	}
+}

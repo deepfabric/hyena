@@ -2,6 +2,7 @@ package raftstore
 
 import (
 	"github.com/fagongzi/log"
+	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
 	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 )
@@ -71,4 +72,16 @@ func (d *applyDelegate) execUpdate(ctx *applyContext, req *rpc.UpdateRequest) {
 	rsp := util.AcquireUpdateRsp()
 	rsp.ID = req.ID
 	ctx.resps = append(ctx.resps, rsp)
+}
+
+func (pr *PeerReplicate) execSearch(req *rpc.SearchRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
+	n := len(req.Xq)
+	ds := make([]float32, n, n)
+	ids := make([]int64, n, n)
+
+	_, err := pr.ps.vdb.Search(req.Xq, ds, ids)
+	if err != nil {
+		cbErr(req.ID, errorOtherCMDResp(err))
+		return
+	}
 }

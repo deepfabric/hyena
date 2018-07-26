@@ -3,6 +3,8 @@ package raftstore
 import (
 	"sync"
 
+	"github.com/fagongzi/goetty"
+
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
 )
 
@@ -13,6 +15,7 @@ var (
 	asyncApplyResultPool sync.Pool
 	reqCtxPool           sync.Pool
 	vdbBatchPool         sync.Pool
+	bufPool              sync.Pool
 
 	emptyRaftState  = raftpb.RaftLocalState{}
 	emptyApplyState = raftpb.RaftApplyState{}
@@ -100,4 +103,21 @@ func acquireCmd() *cmd {
 func releaseCmd(value *cmd) {
 	value.reset()
 	cmdPool.Put(value)
+}
+
+func acquireBuf(size int) *goetty.ByteBuf {
+	v := bufPool.Get()
+	if v == nil {
+		return goetty.NewByteBuf(size)
+	}
+
+	value := v.(*goetty.ByteBuf)
+	value.Resume(size)
+	return value
+}
+
+func releaseBuf(value *goetty.ByteBuf) {
+	value.Clear()
+	value.Release()
+	bufPool.Put(value)
 }

@@ -4,7 +4,13 @@ func (rc *Runtime) handleContainer(source *ContainerRuntime) {
 	rc.Lock()
 	defer rc.Unlock()
 
+	evt := EventContainerChanged
+	if _, ok := rc.containers[source.meta.ID()]; !ok {
+		evt = EventContainerCreated
+	}
+
 	rc.containers[source.meta.ID()] = source
+	rc.p.notifyEvent(newContainerEvent(evt, source.meta))
 }
 
 func (rc *Runtime) handleResource(source *ResourceRuntime) error {
@@ -13,7 +19,15 @@ func (rc *Runtime) handleResource(source *ResourceRuntime) error {
 
 	current := rc.getResourceWithoutLock(source.meta.ID())
 	if current == nil {
-		return rc.doPutResource(source)
+		err := rc.doPutResource(source)
+		if err != nil {
+			return err
+		}
+		rc.p.notifyEvent(newResourceEvent(EventResourceCreated, source.meta))
+		if source.leaderPeer != nil {
+			rc.p.notifyEvent(newLeaderChangerEvent(source.meta.ID(), source.leaderPeer.ID))
+		}
+		return nil
 	}
 
 	// resource meta is stale, return an error.
@@ -23,7 +37,13 @@ func (rc *Runtime) handleResource(source *ResourceRuntime) error {
 
 	// resource meta is updated, update kv and cache.
 	if current.meta.Changed(source.meta) {
-		return rc.doPutResource(source)
+		err := rc.doPutResource(source)
+		if err != nil {
+			return err
+		}
+
+		rc.p.notifyEvent(newResourceEvent(EventResourceChaned, source.meta))
+		return nil
 	}
 
 	if current.leaderPeer != nil &&
@@ -32,6 +52,7 @@ func (rc *Runtime) handleResource(source *ResourceRuntime) error {
 			current.meta.ID(),
 			current.leaderPeer.ID,
 			source.leaderPeer.ID)
+		rc.p.notifyEvent(newLeaderChangerEvent(source.meta.ID(), source.leaderPeer.ID))
 	}
 
 	// resource meta is the same, update cache only.
@@ -40,7 +61,7 @@ func (rc *Runtime) handleResource(source *ResourceRuntime) error {
 }
 
 func (rc *Runtime) doPutResource(source *ResourceRuntime) error {
-	err := rc.store.PutResource(source.meta)
+	err := rc.p.store.PutResource(source.meta)
 	if err != nil {
 		return err
 	}

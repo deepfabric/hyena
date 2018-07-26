@@ -5,19 +5,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/infinivision/prophet"
-
 	"github.com/coreos/etcd/raft"
 	"github.com/fagongzi/log"
 	"github.com/infinivision/hyena/pkg/pb/meta"
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
 	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
+	"github.com/infinivision/prophet"
+	"github.com/youzan/go-nsq"
 )
 
 type reqCtx struct {
 	msgType int32
 	admin   *raftpb.AdminRequest
+	search  *rpc.SearchRequest
 	insert  *rpc.InsertRequest
 	update  *rpc.UpdateRequest
 	cb      func(interface{})
@@ -55,6 +56,12 @@ type PeerReplicate struct {
 	heartbeatsMap *sync.Map
 
 	cancelTaskIds []uint64
+
+	consumer        *nsq.Consumer
+	nsqRequests     *util.RingBuffer
+	condL           *sync.Mutex
+	cond            *sync.Cond
+	consumerRunning bool
 }
 
 func createPeerReplicate(store *Store, db *meta.VectorDB) (*PeerReplicate, error) {
@@ -300,5 +307,16 @@ func (pr *PeerReplicate) onUpdate(req *rpc.UpdateRequest, cb func(interface{}), 
 }
 
 func (pr *PeerReplicate) onSearch(req *rpc.SearchRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
-	// TODO: impl
+	pr.waitInsertCommitted(req)
+	pr.execSearch(req, cb, cbErr)
+}
+
+func (pr *PeerReplicate) waitInsertCommitted(req *rpc.SearchRequest) {
+	if pr.isWritable() {
+		pr.condL.Lock()
+		for req.Offset > pr.ps.committedOffset() {
+			pr.cond.Wait()
+		}
+		pr.condL.Unlock()
+	}
 }

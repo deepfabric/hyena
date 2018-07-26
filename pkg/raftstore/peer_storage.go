@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	etcdraft "github.com/coreos/etcd/raft"
 	etcdraftpb "github.com/coreos/etcd/raft/raftpb"
@@ -230,7 +231,7 @@ func (ps *peerStorage) updatePeerState(db meta.VectorDB, state raftpb.PeerState,
 		return wb.Set(getDBStateKey(db.ID), data)
 	}
 
-	return ps.store.metaStore.Set(getDBStateKey(db.ID), data, ps.store.cfg.SyncWrite)
+	return ps.store.metaStore.Set(getDBStateKey(db.ID), data, false)
 }
 
 func (ps *peerStorage) writeInitialState(id uint64, wb storage.WriteBatch) error {
@@ -304,6 +305,14 @@ func (ps *peerStorage) isInitialized() bool {
 
 func (ps *peerStorage) committedIndex() uint64 {
 	return ps.raftlocalState.HardState.Commit
+}
+
+func (ps *peerStorage) committedOffset() uint64 {
+	return atomic.LoadUint64(&ps.raftApplyState.CommitedOffset)
+}
+
+func (ps *peerStorage) setCommittedOffset(offset uint64) {
+	atomic.StoreUint64(&ps.raftApplyState.CommitedOffset, offset)
 }
 
 func (ps *peerStorage) appliedIndex() uint64 {
@@ -551,7 +560,7 @@ func (ps *peerStorage) Snapshot() (etcdraftpb.Snapshot, error) {
 		ps.db.Epoch)
 	ps.snapTriedCnt++
 
-	err := ps.store.addSnapJob(ps.doGenSnapJob, ps.setGenSnapJob)
+	err := ps.store.addApplyJob(ps.db.ID, "doGenSnapJob", ps.doGenSnapJob, ps.setGenSnapJob)
 	if err != nil {
 		log.Fatalf("raftstore[db-%d]: add generate job failed, errors:\n %+v",
 			ps.db.ID,

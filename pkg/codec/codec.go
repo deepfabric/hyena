@@ -54,6 +54,9 @@ func (c *codec) Decode(in *goetty.ByteBuf) (bool, interface{}, error) {
 	case rpc.MsgUpdateRsp:
 		value = util.AcquireUpdateRsp()
 		break
+	case rpc.MsgErrorRsp:
+		value = util.AcquireErrorRsp()
+		break
 	default:
 		return false, nil, fmt.Errorf("not support msg type: %d", data[0])
 	}
@@ -91,6 +94,10 @@ func (c *codec) Encode(data interface{}, out *goetty.ByteBuf) error {
 		target = t
 	case *rpc.UpdateResponse:
 		out.WriteByte(byte(rpc.MsgUpdateRsp))
+		target = t
+		break
+	case *rpc.ErrResponse:
+		out.WriteByte(byte(rpc.MsgErrorRsp))
 		target = t
 		break
 	}

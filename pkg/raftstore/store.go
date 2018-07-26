@@ -13,14 +13,12 @@ import (
 	"github.com/fagongzi/util/task"
 	"github.com/infinivision/hyena/pkg/pb/meta"
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
-	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 	"github.com/infinivision/prophet"
 )
 
 const (
 	applyWorker      = "apply-worker-%d"
-	snapWorker       = "snap-worerk"
 	splitWorker      = "split-worker"
 	prophetWorker    = "prophet-worker"
 	logCompactWorker = "log-compact-worker"
@@ -84,7 +82,6 @@ func NewStoreWithCfg(meta meta.Store, cfg *Cfg) *Store {
 	for i := 0; i < int(s.cfg.ApplyWorkerCount); i++ {
 		s.runner.AddNamedWorker(fmt.Sprintf(applyWorker, i))
 	}
-	s.runner.AddNamedWorker(snapWorker)
 	s.runner.AddNamedWorker(prophetWorker)
 	s.runner.AddNamedWorker(splitWorker)
 	s.runner.AddNamedWorker(logCompactWorker)
@@ -119,36 +116,6 @@ func (s *Store) Stop() error {
 	s.trans.stop()
 	err := s.runner.Stop()
 	return err
-}
-
-// OnReq on request
-func (s *Store) OnReq(value interface{}, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) error {
-	var id uint64
-	var uuid []byte
-	var pr *PeerReplicate
-
-	if req, ok := value.(*rpc.InsertRequest); ok {
-		pr = s.getWriteableDB()
-		uuid = req.ID
-	} else if req, ok := value.(*rpc.UpdateRequest); ok {
-		id = req.DB
-		pr = s.getDB(req.DB, true)
-		uuid = req.ID
-	} else if req, ok := value.(*rpc.SearchRequest); ok {
-		id = req.DB
-		pr = s.getDB(req.DB, false)
-		uuid = req.ID
-	} else {
-		return fmt.Errorf("not support msg: %T", value)
-	}
-
-	if nil == pr {
-		cbErr(uuid, errorDBNotFound(id))
-		return nil
-	}
-
-	// TODO: impl
-	return nil
 }
 
 func (s *Store) startTransfer() {
@@ -202,6 +169,7 @@ func (s *Store) startDBs() {
 
 		pr.startRegistrationJob()
 		s.replicates.Store(id, pr)
+
 		return true, nil
 	})
 
@@ -629,7 +597,7 @@ func (s *Store) getWriteableDB() *PeerReplicate {
 	var pr *PeerReplicate
 	s.replicates.Range(func(key, value interface{}) bool {
 		p := value.(*PeerReplicate)
-		if p.ps.db.State == meta.RWU && p.isLeader() {
+		if p.isWritable() && p.isLeader() {
 			pr = p
 			return false
 		}

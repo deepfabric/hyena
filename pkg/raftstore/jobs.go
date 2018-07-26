@@ -188,6 +188,7 @@ func (ps *peerStorage) doGenSnapJob() error {
 			return nil
 		}
 	}
+	msg.Header.CommitedOffset = ps.committedOffset()
 
 	snapshot.Data = pbutil.MustMarshal(msg)
 	ps.genSnapJob.SetResult(snapshot)
@@ -364,10 +365,6 @@ func (s *Store) addProphetJob(task func() error, cb func(*task.Job)) error {
 
 func (s *Store) addCompactRaftLogJob(task func() error) error {
 	return s.addNamedJob("", logCompactWorker, task)
-}
-
-func (s *Store) addSnapJob(task func() error, cb func(*task.Job)) error {
-	return s.addNamedJobWithCB("", snapWorker, task, cb)
 }
 
 func (s *Store) addApplyJob(id uint64, desc string, task func() error, cb func(*task.Job)) error {

@@ -79,10 +79,15 @@ func (p *Prophet) enableLeader() {
 	log.Infof("prophet: ********become to leader now********")
 	p.leader = p.node
 
-	p.rt = newRuntime(p.store)
+	p.rt = newRuntime(p)
 	p.rt.load()
+
 	p.coordinator = newCoordinator(p.cfg, p.runner, p.rt)
 	p.coordinator.start()
+
+	p.wn = newWatcherNotifier(p.rt)
+	go p.wn.start()
+
 	p.notifyElectionComplete()
 	p.cfg.Handler.BecomeLeader()
 }
@@ -97,6 +102,12 @@ func (p *Prophet) disableLeader() {
 		p.coordinator.stop()
 		p.rt = nil
 	}
+
+	if p.wn != nil {
+		p.wn.stop()
+		p.wn = nil
+	}
+
 	p.cfg.Handler.BecomeFollower()
 }
 

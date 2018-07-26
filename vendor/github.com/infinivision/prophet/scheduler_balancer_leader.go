@@ -45,8 +45,8 @@ func (l *balanceResourceLeaderScheduler) Schedule(rt *Runtime) Operator {
 		return nil
 	}
 
-	source := rt.GetContainer(res.leaderPeer.ContainerID)
-	target := rt.GetContainer(newLeader.ContainerID)
+	source := rt.Container(res.leaderPeer.ContainerID)
+	target := rt.Container(newLeader.ContainerID)
 	if !shouldBalance(source, target, l.ResourceKind()) {
 		return nil
 	}
@@ -57,7 +57,7 @@ func (l *balanceResourceLeaderScheduler) Schedule(rt *Runtime) Operator {
 
 // scheduleTransferLeader schedules a resource to transfer leader to the peer.
 func scheduleTransferLeader(rt *Runtime, s Selector, filters ...Filter) (*ResourceRuntime, *Peer) {
-	containers := rt.GetContainers()
+	containers := rt.Containers()
 	if len(containers) == 0 {
 		return nil, nil
 	}
@@ -89,7 +89,7 @@ func scheduleTransferLeader(rt *Runtime, s Selector, filters ...Filter) (*Resour
 			return nil, nil
 		}
 
-		targetContainers := rt.GetResourceFollowerContainers(res)
+		targetContainers := rt.ResourceFollowerContainers(res)
 		target := s.SelectTarget(targetContainers)
 		if target == nil {
 			return nil, nil

@@ -8,6 +8,7 @@ import (
 	"github.com/fagongzi/util/task"
 	"github.com/infinivision/hyena/pkg/codec"
 	"github.com/infinivision/hyena/pkg/pb/meta"
+	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/raftstore"
 )
 
@@ -18,6 +19,7 @@ type Server struct {
 
 	tcpL     *goetty.Server
 	sessions *sync.Map
+	routing  *sync.Map
 
 	// raftstore
 	store *raftstore.Store
@@ -50,6 +52,7 @@ func NewServer(addr, raftAddr string, opts ...Option) *Server {
 		stopC:    make(chan struct{}),
 		store:    raftstore.NewStore(meta, sopts.raftOptions...),
 		sessions: &sync.Map{},
+		routing:  &sync.Map{},
 		tcpL: goetty.NewServer(addr,
 			goetty.WithServerDecoder(codec.GetDecoder()),
 			goetty.WithServerEncoder(codec.GetEncoder())),
@@ -102,22 +105,32 @@ func (s *Server) startTCP() {
 
 func (s *Server) doConnection(conn goetty.IOSession) error {
 	addr := conn.RemoteAddr()
-	log.Debugf("net: %s connected", addr)
+	log.Debugf("client: %s connected", addr)
 
-	client := newSession(conn)
-	s.sessions.Store(client.id, client)
+	session := newSession(conn)
+	s.sessions.Store(session.id, session)
+	go session.writeLoop()
+
 	defer func() {
-		s.sessions.Delete(client.id)
-		client.close()
+		s.sessions.Delete(session.id)
+		session.close()
 	}()
 
-	// The client usually is a proxy, the proxy can send insert,update,search or batch request,
-	// batch request only contains one kind request, not support mixing batch request.
+	// The session usually is a proxy, the proxy can send insert,update,search.
 	for {
-		_, err := conn.ReadTimeout(s.opts.timeoutRead)
+		req, err := conn.ReadTimeout(s.opts.timeoutRead)
 		if err != nil {
 			return err
 		}
 
+		log.Debugf("client: get a req %+v", req)
+
+		if value, ok := req.(*rpc.InsertRequest); ok {
+			s.handleInsert(value, session.id)
+		} else if value, ok := req.(*rpc.UpdateRequest); ok {
+			s.handleUpdate(value, session.id)
+		} else if value, ok := req.(*rpc.SearchRequest); ok {
+			s.handleSearch(value, session.id)
+		}
 	}
 }

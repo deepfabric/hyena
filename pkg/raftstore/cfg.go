@@ -57,6 +57,10 @@ type Cfg struct {
 	Dim     int
 	FlatThr int
 	DistThr float32
+
+	// about nsq
+	Topic, Channel string
+	NSQLookupURLs  []string
 }
 
 // Adjust adjust

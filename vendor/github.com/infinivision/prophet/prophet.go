@@ -50,6 +50,8 @@ type Prophet struct {
 	completeC   chan struct{}
 	rpc         *simpleRPC
 	bizCodec    *codec
+
+	wn *watcherNotifier
 }
 
 // NewProphet returns a prophet instance

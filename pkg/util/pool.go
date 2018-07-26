@@ -16,6 +16,7 @@ var (
 	insertRspPool      sync.Pool
 	updateReqPool      sync.Pool
 	updateRspPool      sync.Pool
+	errRspPool         sync.Pool
 )
 
 // AcquireRaftMessage returns a raft message from pool
@@ -136,4 +137,19 @@ func AcquireUpdateRsp() *rpc.UpdateResponse {
 func ReleaseUpdateRsp(value *rpc.UpdateResponse) {
 	value.Reset()
 	updateRspPool.Put(value)
+}
+
+// AcquireErrorRsp returns a value from pool
+func AcquireErrorRsp() *rpc.ErrResponse {
+	v := errRspPool.Get()
+	if v == nil {
+		return &rpc.ErrResponse{}
+	}
+	return v.(*rpc.ErrResponse)
+}
+
+// ReleaseErrorRsp returns a value to pool
+func ReleaseErrorRsp(value *rpc.ErrResponse) {
+	value.Reset()
+	errRspPool.Put(value)
 }

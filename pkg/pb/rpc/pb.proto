@@ -16,25 +16,31 @@ enum MsgType {
     MsgInsertRsp = 3;
     MsgUpdateReq = 4;
     MsgUpdateRsp = 5;
-    MsgAdmin     = 6;
+    MsgErrorRsp  = 6;
+    MsgAdmin     = 7;
 }
 
 // SearchRequest search request
 message SearchRequest {
-    optional bytes  id = 1 [(gogoproto.customname) = "ID"];
-    optional uint64 db = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+    optional bytes  id      = 1 [(gogoproto.customname) = "ID"];
+    optional uint64 db      = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+    repeated float  xq      = 3;
+    optional uint64 offset  = 4 [(gogoproto.nullable) = false];
 }
 
 // SearchResponse search response
 message SearchResponse {
-    optional bytes id = 1 [(gogoproto.customname) = "ID"];
+    optional bytes id        = 1 [(gogoproto.customname) = "ID"];
+    repeated float distances = 2;
+    repeated int64 xids      = 3;
 }
 
 // InsertRequest insert request
 message InsertRequest {
-    optional bytes id  = 1 [(gogoproto.customname) = "ID"];
-    repeated float xbs = 2;
-    repeated int64 ids = 3;
+    optional bytes  id     = 1 [(gogoproto.customname) = "ID"];
+    repeated float  xbs    = 2;
+    repeated int64  ids    = 3;
+    optional uint64 offset = 4 [(gogoproto.nullable) = false];
 }
 
 // InsertResponse insert response
@@ -53,4 +59,10 @@ message UpdateRequest {
 // UpdateResponse update response
 message UpdateResponse {
     optional bytes id = 1 [(gogoproto.customname) = "ID"];
+}
+
+// ErrResponse error response
+message ErrResponse {
+    optional bytes id    = 1 [(gogoproto.customname) = "ID"];
+    optional bytes error = 2;
 }

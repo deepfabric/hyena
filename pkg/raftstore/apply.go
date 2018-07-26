@@ -240,7 +240,7 @@ func (d *applyDelegate) applyEntry(ctx *applyContext, entry etcdraftpb.Entry) *e
 	state := d.applyState
 	state.AppliedIndex = entry.Index
 
-	err := d.store.metaStore.Set(getRaftApplyStateKey(d.db.ID), pbutil.MustMarshal(&state), d.store.cfg.SyncWrite)
+	err := d.store.metaStore.Set(getRaftApplyStateKey(d.db.ID), pbutil.MustMarshal(&state), false)
 	if err != nil {
 		log.Fatalf("raftstore-apply[db-%d]: apply empty entry failed, errors:\n %+v",
 			d.db.ID,
@@ -295,10 +295,6 @@ func (d *applyDelegate) doApplyRaftCMD(ctx *applyContext) *execResult {
 		} else {
 			d.execWriteRequest(ctx)
 		}
-	}
-
-	if ctx.vdbBatch != nil {
-
 	}
 
 	err = ctx.vdbBatch.do(d)

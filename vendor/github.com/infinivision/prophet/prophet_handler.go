@@ -37,7 +37,7 @@ func (p *Prophet) handleResourceHeartbeat(msg *ResourceHeartbeatReq) (*resourceH
 		return nil, errReq
 	}
 
-	return p.coordinator.dispatch(p.rt.GetResource(value.meta.ID())), nil
+	return p.coordinator.dispatch(p.rt.Resource(value.meta.ID())), nil
 }
 
 func (p *Prophet) handleContainerHeartbeat(msg *ContainerHeartbeatReq) error {
@@ -49,7 +49,7 @@ func (p *Prophet) handleContainerHeartbeat(msg *ContainerHeartbeatReq) error {
 	p.Lock()
 	defer p.Unlock()
 
-	container := p.rt.GetContainer(meta.ID())
+	container := p.rt.Container(meta.ID())
 	if container == nil {
 		err := p.store.PutContainer(meta)
 		if err != nil {
@@ -87,7 +87,7 @@ func (p *Prophet) handleAskSplit(req *askSplitReq) *askSplitRsp {
 
 	rsp := &askSplitRsp{}
 
-	res := p.rt.GetResource(req.Resource.ID())
+	res := p.rt.Resource(req.Resource.ID())
 	if res == nil {
 		rsp.Err = fmt.Errorf("resource not found")
 		return rsp

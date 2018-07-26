@@ -32,8 +32,9 @@ message RaftLocalState {
 
 // RaftApplyState raft apply state
 message RaftApplyState {
-    optional uint64             appliedIndex   = 1 [(gogoproto.nullable) = false];
-    optional RaftTruncatedState truncatedState = 2 [(gogoproto.nullable) = false];
+    optional uint64             commitedOffset = 1 [(gogoproto.nullable) = false];
+    optional uint64             appliedIndex   = 2 [(gogoproto.nullable) = false];
+    optional RaftTruncatedState truncatedState = 3 [(gogoproto.nullable) = false];
 }
 
 // RaftTruncatedState raft snapshot state
@@ -54,12 +55,13 @@ message RaftMessage  {
 
 // SnapshotMessageHeader snapshot header
 message SnapshotMessageHeader {
-    optional meta.VectorDB db    = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
-    optional meta.Peer     from  = 2 [(gogoproto.nullable) = false];
-    optional meta.Peer     to    = 3 [(gogoproto.nullable) = false];
-    optional uint64        term  = 4 [(gogoproto.nullable) = false];
-    optional uint64        index = 5 [(gogoproto.nullable) = false];
-    optional uint64        seq   = 6 [(gogoproto.nullable) = false];
+    optional meta.VectorDB db             = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+    optional meta.Peer     from           = 2 [(gogoproto.nullable) = false];
+    optional meta.Peer     to             = 3 [(gogoproto.nullable) = false];
+    optional uint64        term           = 4 [(gogoproto.nullable) = false];
+    optional uint64        index          = 5 [(gogoproto.nullable) = false];
+    optional uint64        seq            = 6 [(gogoproto.nullable) = false];
+    optional uint64        commitedOffset = 7 [(gogoproto.nullable) = false];
 }
 
 // SnapshotMessage message

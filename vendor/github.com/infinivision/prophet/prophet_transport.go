@@ -19,9 +19,9 @@ const (
 	typeAllocIDRsp
 	typeAskSplitReq
 	typeAskSplitRsp
-	typeReportSplitReq
-	typeReportSplitRsp
 	typeErrorRsp
+	typeInitWatcher
+	typeEventNotify
 )
 
 // ResourceHeartbeatReq resource hb msg
@@ -225,6 +225,12 @@ func (c *codec) Encode(data interface{}, out *goetty.ByteBuf) error {
 	} else if msg, ok := data.(*errorRsp); ok {
 		target = msg
 		t = typeErrorRsp
+	} else if msg, ok := data.(*InitWatcher); ok {
+		target = msg
+		t = typeInitWatcher
+	} else if msg, ok := data.(*EventNotify); ok {
+		target = msg
+		t = typeEventNotify
 	} else {
 		return fmt.Errorf("not support msg: %+v", data)
 	}
@@ -281,6 +287,12 @@ func (c *codec) Decode(in *goetty.ByteBuf) (bool, interface{}, error) {
 	case typeErrorRsp:
 		msg = &errorRsp{}
 		break
+	case typeInitWatcher:
+		msg = &InitWatcher{}
+		break
+	case typeEventNotify:
+		msg = &EventNotify{}
+		break
 	default:
 		return false, nil, fmt.Errorf("unknown msg type")
 	}
@@ -315,6 +327,8 @@ func (p *Prophet) startListen() {
 }
 
 func (p *Prophet) doConnection(conn goetty.IOSession) error {
+	defer p.wn.clearWatcher(conn)
+
 	for {
 		value, err := conn.Read()
 		if err != nil {
@@ -340,6 +354,8 @@ func (p *Prophet) doConnection(conn goetty.IOSession) error {
 			conn.WriteAndFlush(p.handleAllocID(msg))
 		} else if msg, ok := value.(*askSplitReq); ok {
 			conn.WriteAndFlush(p.handleAskSplit(msg))
+		} else if msg, ok := value.(*InitWatcher); ok {
+			p.wn.onInitWatcher(msg, conn)
 		}
 	}
 }

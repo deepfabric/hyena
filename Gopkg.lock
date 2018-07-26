@@ -224,7 +224,7 @@
   branch = "master"
   name = "github.com/infinivision/prophet"
   packages = ["."]
-  revision = "fb5b0491d7c8a80870e1796436d6f38eec82dfea"
+  revision = "d9c836e564176c081626780d42372e7a4502b683"
 
 [[projects]]
   name = "github.com/jonboulle/clockwork"

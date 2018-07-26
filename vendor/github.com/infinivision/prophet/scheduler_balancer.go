@@ -19,7 +19,7 @@ func shouldBalance(source, target *ContainerRuntime, kind ResourceKind) bool {
 }
 
 func adjustBalanceLimit(rt *Runtime, kind ResourceKind) uint64 {
-	containers := rt.GetContainers()
+	containers := rt.Containers()
 
 	counts := make([]float64, 0, len(containers))
 	for _, c := range containers {
