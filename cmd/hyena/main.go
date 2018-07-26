@@ -103,6 +103,11 @@ var (
 	dim     = flag.Int("dim", 512, "vector dim")
 	flatThr = flag.Int("flat", 1000, "vector flatThr")
 	distThr = flag.Float64("dist", 0.6, "vector distThr")
+
+	// about nsq
+	topic      = flag.String("nsq-topic", "", "NSQ: topic")
+	channel    = flag.String("nsq-channel", "", "NSQ: channel")
+	lookupURLs = flag.String("nsq-lookup", "", "NSQ: lookupURLs")
 )
 
 func main() {
@@ -164,6 +169,21 @@ func parseOptions() []server.Option {
 
 	if *rack == "" {
 		fmt.Println("rack must be set")
+		os.Exit(-1)
+	}
+
+	if *topic == "" {
+		fmt.Println("nsq topic must be set")
+		os.Exit(-1)
+	}
+
+	if *channel == "" {
+		fmt.Println("nsq channel must be set")
+		os.Exit(-1)
+	}
+
+	if *lookupURLs == "" {
+		fmt.Println("nsq loopup urls must be set")
 		os.Exit(-1)
 	}
 
@@ -255,6 +275,7 @@ func parseOptions() []server.Option {
 	opts = append(opts, server.WithRaftOption(raftstore.WithDim(*dim)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithFlatThr(*flatThr)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithDistThr(float32(*distThr))))
+	opts = append(opts, server.WithRaftOption(raftstore.WithNSQ(*topic, *channel, strings.Split(*lookupURLs, ","))))
 	return opts
 }
 
