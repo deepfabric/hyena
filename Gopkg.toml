@@ -31,6 +31,10 @@ ignored = ["github.com/deepfabric/c-nemo", "github.com/deepfabric/go-nemo", "git
   version = "v3.3.4"
   source = "github.com/deepfabric/etcd"
 
+[[constraint]]
+  name = "github.com/youzan/go-nsq"
+  version = "1.2.1-HA"
+
 [prune]
   go-tests = true
   unused-packages = true

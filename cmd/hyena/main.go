@@ -28,6 +28,7 @@ import (
 	"github.com/fagongzi/log"
 	"github.com/infinivision/hyena/pkg/raftstore"
 	"github.com/infinivision/hyena/pkg/server"
+	"github.com/infinivision/hyena/pkg/util"
 	"github.com/infinivision/prophet"
 )
 
@@ -108,12 +109,20 @@ var (
 	topic      = flag.String("nsq-topic", "", "NSQ: topic")
 	channel    = flag.String("nsq-channel", "", "NSQ: channel")
 	lookupURLs = flag.String("nsq-lookup", "", "NSQ: lookupURLs")
+
+	// about version
+	version = flag.Bool("version", false, "show version")
 )
 
 func main() {
 	flag.Parse()
-
 	log.InitLog()
+
+	if *version {
+		util.PrintVersion()
+		os.Exit(0)
+	}
+
 	if "" != *pprof {
 		log.Infof("start pprof at: %s", *pprof)
 		go func() {
