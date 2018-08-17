@@ -105,7 +105,6 @@ func (p *Prophet) disableLeader() {
 
 	if p.wn != nil {
 		p.wn.stop()
-		p.wn = nil
 	}
 
 	p.cfg.Handler.BecomeFollower()

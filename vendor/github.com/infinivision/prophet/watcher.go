@@ -143,7 +143,7 @@ func (evt *EventNotify) ReadInitEventValues(resourceF func([]byte, uint64), cont
 
 	for i := 0; i < rn; i++ {
 		size, _ := buf.ReadInt()
-		_, data, _ := buf.ReadBytes(size)
+		_, data, _ := buf.ReadBytes(size - 8)
 		leader, _ := buf.ReadUInt64()
 		resourceF(data, leader)
 	}
@@ -244,8 +244,10 @@ func (wn *watcherNotifier) onInitWatcher(msg *InitWatcher, conn goetty.IOSession
 }
 
 func (wn *watcherNotifier) clearWatcher(conn goetty.IOSession) {
+	wn.Lock()
 	log.Infof("prophet: clear watcher %s", conn.RemoteIP())
 	wn.watchers.Delete(conn.ID())
+	wn.Unlock()
 }
 
 func (wn *watcherNotifier) stop() {

@@ -31,6 +31,7 @@ func newRouter(timeout time.Duration, addrs ...string) *router {
 		stores:      make(map[uint64]*meta.Store),
 		dbs:         make(map[uint64]*meta.VectorDB),
 		leaders:     make(map[uint64]uint64),
+		transports:  make(map[uint64]*transport),
 		ctxs:        &sync.Map{},
 		timeout:     timeout,
 	}

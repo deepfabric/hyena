@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/Shopify/sarama"
 	etcdraft "github.com/coreos/etcd/raft"
 	etcdraftpb "github.com/coreos/etcd/raft/raftpb"
 	"github.com/deepfabric/storage"
@@ -22,6 +23,8 @@ const (
 	// so that we can force the follower peer to sync the snapshot first.
 	raftInitLogTerm  = 5
 	raftInitLogIndex = 5
+
+	mqInitCommittedOffset = sarama.OffsetOldest
 
 	maxSnapTryCnt = 10
 )
@@ -43,8 +46,9 @@ type peerStorage struct {
 	applySnapJob *task.Job
 	snapLock     sync.Mutex
 
-	vectorRecords uint64
-	inAsking      bool
+	commitedOffsetAtSplit uint64
+	vectorRecords         uint64
+	inAsking              bool
 }
 
 func newPeerStorage(store *Store, db meta.VectorDB) (*peerStorage, error) {
@@ -135,6 +139,7 @@ func (ps *peerStorage) initRaftApplyState() error {
 		ps.raftApplyState.AppliedIndex = raftInitLogIndex
 		ps.raftApplyState.TruncatedState.Index = raftInitLogIndex
 		ps.raftApplyState.TruncatedState.Term = raftInitLogTerm
+		ps.raftApplyState.CommittedOffset = mqInitCommittedOffset
 	}
 
 	return nil
@@ -189,7 +194,16 @@ func (ps *peerStorage) initVectorDB() error {
 		return err
 	}
 
+	records, err := vdb.Records()
+	if err != nil {
+		return err
+	}
+
 	ps.vdb = vdb
+	ps.vectorRecords = records
+	log.Infof("raftstore[db-%d]: init with %d records",
+		ps.db.ID,
+		ps.vectorRecords)
 	return err
 }
 
@@ -234,7 +248,7 @@ func (ps *peerStorage) updatePeerState(db meta.VectorDB, state raftpb.PeerState,
 	return ps.store.metaStore.Set(getDBStateKey(db.ID), data, false)
 }
 
-func (ps *peerStorage) writeInitialState(id uint64, wb storage.WriteBatch) error {
+func (ps *peerStorage) writeInitialState(id uint64, committedOffset int64, wb storage.WriteBatch) error {
 	raftState := new(raftpb.RaftLocalState)
 	raftState.LastIndex = raftInitLogIndex
 	raftState.HardState.Term = raftInitLogTerm
@@ -244,6 +258,7 @@ func (ps *peerStorage) writeInitialState(id uint64, wb storage.WriteBatch) error
 	applyState.AppliedIndex = raftInitLogIndex
 	applyState.TruncatedState.Index = raftInitLogIndex
 	applyState.TruncatedState.Term = raftInitLogTerm
+	applyState.CommittedOffset = committedOffset
 
 	err := wb.Set(getRaftLocalStateKey(id), pbutil.MustMarshal(raftState))
 	if err != nil {
@@ -307,12 +322,12 @@ func (ps *peerStorage) committedIndex() uint64 {
 	return ps.raftlocalState.HardState.Commit
 }
 
-func (ps *peerStorage) committedOffset() uint64 {
-	return atomic.LoadUint64(&ps.raftApplyState.CommitedOffset)
+func (ps *peerStorage) committedOffset() int64 {
+	return atomic.LoadInt64(&ps.raftApplyState.CommittedOffset)
 }
 
-func (ps *peerStorage) setCommittedOffset(offset uint64) {
-	atomic.StoreUint64(&ps.raftApplyState.CommitedOffset, offset)
+func (ps *peerStorage) setCommittedOffset(offset int64) {
+	atomic.StoreInt64(&ps.raftApplyState.CommittedOffset, offset)
 }
 
 func (ps *peerStorage) appliedIndex() uint64 {

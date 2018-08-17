@@ -148,6 +148,7 @@ func (s *Store) saveDB(db meta.VectorDB) error {
 		Term:  raftInitLogTerm,
 		Index: raftInitLogIndex,
 	}
+	raftApplyState.CommittedOffset = mqInitCommittedOffset
 	err = wb.Set(getRaftApplyStateKey(db.ID), pbutil.MustMarshal(raftApplyState))
 	if err != nil {
 		return err

@@ -1,13 +1,13 @@
 package proxy
 
 import (
-	"hash/crc32"
 	"sync"
 
+	"github.com/Shopify/sarama"
 	"github.com/fagongzi/goetty"
+	"github.com/fagongzi/log"
 	"github.com/infinivision/hyena/pkg/codec"
 	"github.com/infinivision/hyena/pkg/pb/rpc"
-	"github.com/youzan/go-nsq"
 )
 
 type mqBasedProxy struct {
@@ -15,19 +15,19 @@ type mqBasedProxy struct {
 
 	opts            *options
 	topic           string
-	lookups         []string
-	producer        *nsq.TopicProducerMgr
-	committedOffset uint64
+	addrs           []string
+	producer        sarama.SyncProducer
+	committedOffset int64
 
 	prophetAddrs []string
 	router       *router
 }
 
 // NewMQBasedProxy return a Proxy based on mq
-func NewMQBasedProxy(topic string, lookups []string, prophetAddrs []string, opts ...Option) (Proxy, error) {
+func NewMQBasedProxy(topic string, addrs []string, prophetAddrs []string, opts ...Option) (Proxy, error) {
 	p := new(mqBasedProxy)
 	p.topic = topic
-	p.lookups = lookups
+	p.addrs = addrs
 	p.prophetAddrs = prophetAddrs
 	p.opts = &options{}
 
@@ -50,22 +50,22 @@ func (p *mqBasedProxy) initRouter() {
 }
 
 func (p *mqBasedProxy) initProducer() error {
-	cfg := nsq.NewConfig()
-	cfg.EnableTrace = true
-	cfg.Hasher = crc32.NewIEEE()
+	config := sarama.NewConfig()
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Retry.Max = 10
+	config.Producer.Return.Successes = true
 
-	pm, err := nsq.NewTopicProducerMgr([]string{p.topic}, cfg)
+	producer, err := sarama.NewSyncProducer(p.addrs, config)
 	if err != nil {
 		return err
 	}
 
-	pm.AddLookupdNodes(p.lookups)
-	p.producer = pm
+	p.producer = producer
 	return nil
 }
 
 func (p *mqBasedProxy) UpdateWithIds(db uint64, extXb []float32, extXids []int64) error {
-	req := rpc.UpdateRequest{
+	req := &rpc.UpdateRequest{
 		DB:  db,
 		Xbs: extXb,
 		Ids: extXids,
@@ -75,7 +75,7 @@ func (p *mqBasedProxy) UpdateWithIds(db uint64, extXb []float32, extXids []int64
 }
 
 func (p *mqBasedProxy) AddWithIds(newXb []float32, newXids []int64) error {
-	req := rpc.InsertRequest{
+	req := &rpc.InsertRequest{
 		Xbs: newXb,
 		Ids: newXids,
 	}
@@ -101,18 +101,25 @@ func (p *mqBasedProxy) doPublish(req interface{}, size int) error {
 		return err
 	}
 
-	data := buf.RawBuf()[:buf.Readable()]
-	_, offset, _, err := p.producer.PublishOrdered(p.topic, data, data)
+	n, data, err := buf.ReadAll()
+	_, offset, err := p.producer.SendMessage(&sarama.ProducerMessage{
+		Topic: p.topic,
+		Value: sarama.ByteEncoder(data),
+	})
 	buf.Release()
 	if err != nil {
 		return err
 	}
 
 	p.resetOffset(offset)
+	log.Infof("topic %s published %d bytes with offset %d",
+		p.topic,
+		n,
+		p.getOffset())
 	return nil
 }
 
-func (p *mqBasedProxy) resetOffset(offset uint64) {
+func (p *mqBasedProxy) resetOffset(offset int64) {
 	p.Lock()
 	if p.committedOffset < offset {
 		p.committedOffset = offset
@@ -120,7 +127,7 @@ func (p *mqBasedProxy) resetOffset(offset uint64) {
 	p.Unlock()
 }
 
-func (p *mqBasedProxy) getOffset() uint64 {
+func (p *mqBasedProxy) getOffset() int64 {
 	p.RLock()
 	value := p.committedOffset
 	p.RUnlock()

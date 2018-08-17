@@ -10,17 +10,19 @@ import (
 )
 
 var (
-	c = &codec{}
+	biz = &codec{}
+	ec  = goetty.NewIntLengthFieldBasedEncoder(biz)
+	dc  = goetty.NewIntLengthFieldBasedDecoder(biz)
 )
 
 // GetEncoder return encoder
 func GetEncoder() goetty.Encoder {
-	return c
+	return ec
 }
 
 // GetDecoder return decoder
 func GetDecoder() goetty.Decoder {
-	return c
+	return dc
 }
 
 type pbValue interface {

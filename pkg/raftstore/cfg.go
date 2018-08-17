@@ -58,9 +58,9 @@ type Cfg struct {
 	FlatThr int
 	DistThr float32
 
-	// about nsq
-	Topic, Channel string
-	NSQLookupURLs  []string
+	// about mq
+	Topic, GroupPrefix string
+	MQAddrs            []string
 }
 
 // Adjust adjust

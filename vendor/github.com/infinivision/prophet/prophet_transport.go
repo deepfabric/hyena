@@ -327,7 +327,9 @@ func (p *Prophet) startListen() {
 }
 
 func (p *Prophet) doConnection(conn goetty.IOSession) error {
-	defer p.wn.clearWatcher(conn)
+	if p.wn != nil {
+		defer p.wn.clearWatcher(conn)
+	}
 
 	for {
 		value, err := conn.Read()

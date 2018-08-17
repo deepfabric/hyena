@@ -384,6 +384,8 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 	}
 
 	// now we can create a replicate
+	// the create replicate will not start the mq consumer now
+	// it will started at after apply the snapshot
 	peerReplicate, err := doReplicate(s, msg, target.ID)
 	if err != nil {
 		log.Errorf("raftstore[db-%d]: replicate peer failure, errors:\n %+v",
@@ -400,6 +402,10 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 	s.replicates.Store(id, peerReplicate)
 	s.addPeerToCache(msg.From)
 	s.addPeerToCache(msg.To)
+
+	log.Infof("raftstore[db-%d]: created by raft msg: %+v",
+		peerReplicate.id,
+		message)
 	return true
 }
 

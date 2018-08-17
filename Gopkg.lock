@@ -2,6 +2,14 @@
 
 
 [[projects]]
+  digest = "1:66b8ed452b31eb9075bc53295952487c333a9cb555de57ed61f5664c058d9050"
+  name = "github.com/Shopify/sarama"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "35324cf48e33d8260e1c7c18854465a904ade249"
+  version = "v1.17.0"
+
+[[projects]]
   digest = "1:e92f5581902c345eb4ceffdcd4a854fb8f73cf436d47d837d1ec98ef1fe0a214"
   name = "github.com/StackExchange/wmi"
   packages = ["."]
@@ -18,7 +26,23 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
-  digest = "1:6bda4e232607261eeaee45b0a0e8a2ef097bd44e8a44d9b7ca1badb36e523891"
+  branch = "master"
+  digest = "1:d8abdc866ebbe05fa3bce50863e23afd4c73c804b90c908caa864e86df1db8a1"
+  name = "github.com/bouk/monkey"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5df1f207ff77e025801505ae4d903133a0b4353f"
+
+[[projects]]
+  digest = "1:4fdffd1724c105db8c394019cfc2444fd23466be04812850506437361ee5de55"
+  name = "github.com/bsm/sarama-cluster"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "cf455bc755fe41ac9bb2861e7a961833d9c2ecc3"
+  version = "v2.1.13"
+
+[[projects]]
+  digest = "0:"
   name = "github.com/coreos/bbolt"
   packages = ["."]
   pruneopts = "UT"
@@ -127,6 +151,14 @@
   version = "v4"
 
 [[projects]]
+  digest = "1:a2c1d0e43bd3baaa071d1b9ed72c27d78169b2b269f71c105ac4ba34b1be4a39"
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  pruneopts = "UT"
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "master"
   digest = "1:8ffc127ef72b9b5b63ae784be4e6ea4ccb85280c24663f4b63505e1f95d7ccf6"
   name = "github.com/deepfabric/storage"
@@ -141,6 +173,30 @@
   pruneopts = "UT"
   revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
   version = "v3.2.0"
+
+[[projects]]
+  digest = "1:1f0c7ab489b407a7f8f9ad16c25a504d28ab461517a971d341388a56156c1bd7"
+  name = "github.com/eapache/go-resiliency"
+  packages = ["breaker"]
+  pruneopts = "UT"
+  revision = "ea41b0fad31007accc7f806884dcdf3da98b79ce"
+  version = "v1.1.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:79f16588b5576b1b3cd90e48d2374cc9a1a8776862d28d8fd0f23b0e15534967"
+  name = "github.com/eapache/go-xerial-snappy"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "776d5712da21bc4762676d614db1d8a64f4238b0"
+
+[[projects]]
+  digest = "1:444b82bfe35c83bbcaf84e310fb81a1f9ece03edfed586483c869e2c046aef69"
+  name = "github.com/eapache/queue"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "44cc805cf13205b55f69e14bcb69867d1ae92f98"
+  version = "v1.1.0"
 
 [[projects]]
   digest = "1:612bf1e995acc09402b8af081de41e64a5484d8281a0f60fdb5d2f7ac609a09d"
@@ -264,11 +320,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a35e401668982257fd7e8fbf547e95afdccc0ad9da115b882e68522409bc4e13"
+  digest = "1:8cd95d415055206568938319e9dc9964b18131fe2a4438001ca50b99892f9392"
   name = "github.com/infinivision/prophet"
   packages = ["."]
   pruneopts = "UT"
-  revision = "d9c836e564176c081626780d42372e7a4502b683"
+  revision = "1cbe907ddb976b57a6c242f5f0727de7621dea85"
 
 [[projects]]
   digest = "1:75ab90ae3f5d876167e60f493beadfe66f0ed861a710f283fb06c86437a09538"
@@ -293,6 +349,17 @@
   packages = ["llrb"]
   pruneopts = "UT"
   revision = "53be0d36a84c2a886ca057d34b6aa4468df9ccb4"
+
+[[projects]]
+  digest = "1:29803f52611cbcc1dfe55b456e9fdac362af7248b3d29d7ea1bec0a12e71dff4"
+  name = "github.com/pierrec/lz4"
+  packages = [
+    ".",
+    "internal/xxh32",
+  ]
+  pruneopts = "UT"
+  revision = "1958fd8fff7f115e79725b1288e0b878b3e06b00"
+  version = "v2.0.3"
 
 [[projects]]
   digest = "1:d14a5f4bfecf017cb780bdde1b6483e5deb87e12c332544d2c430eda58734bcb"
@@ -337,6 +404,14 @@
   ]
   pruneopts = "UT"
   revision = "7d6f385de8bea29190f15ba9931442a0eaef9af7"
+
+[[projects]]
+  branch = "master"
+  digest = "1:c4556a44e350b50a490544d9b06e9fba9c286c21d6c0e47f54f3a9214597298c"
+  name = "github.com/rcrowley/go-metrics"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
   digest = "1:de61d9147d0d96bcf8bad16b8f5b0fbc3bce8d974ca93b97aba27275c66110a9"
@@ -388,14 +463,6 @@
   pruneopts = "UT"
   revision = "07dd2e8dfe18522e9c447ba95f2fe95262f63bb2"
   version = "0.0.1"
-
-[[projects]]
-  digest = "1:4925f1e3aea619efd24c60c8a999ba493ae8265885094cd967d282fa3b922b33"
-  name = "github.com/youzan/go-nsq"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "048121fec907f996575436fbb02824057ade6f32"
-  version = "1.2.1-HA"
 
 [[projects]]
   branch = "master"
@@ -522,6 +589,9 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/Shopify/sarama",
+    "github.com/bouk/monkey",
+    "github.com/bsm/sarama-cluster",
     "github.com/coreos/etcd/clientv3",
     "github.com/coreos/etcd/raft",
     "github.com/coreos/etcd/raft/raftpb",
@@ -535,7 +605,6 @@
     "github.com/golang/protobuf/proto",
     "github.com/infinivision/prophet",
     "github.com/shirou/gopsutil/disk",
-    "github.com/youzan/go-nsq",
     "golang.org/x/net/context",
     "golang.org/x/time/rate",
   ]

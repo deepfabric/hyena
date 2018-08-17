@@ -25,7 +25,7 @@ message SearchRequest {
     optional bytes  id      = 1 [(gogoproto.customname) = "ID"];
     optional uint64 db      = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
     repeated float  xq      = 3;
-    optional uint64 offset  = 4 [(gogoproto.nullable) = false];
+    optional int64  offset  = 4 [(gogoproto.nullable) = false];
 }
 
 // SearchResponse search response
@@ -40,7 +40,7 @@ message InsertRequest {
     optional bytes  id     = 1 [(gogoproto.customname) = "ID"];
     repeated float  xbs    = 2;
     repeated int64  ids    = 3;
-    optional uint64 offset = 4 [(gogoproto.nullable) = false];
+    optional int64  offset = 4 [(gogoproto.nullable) = false];
 }
 
 // InsertResponse insert response

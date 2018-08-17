@@ -238,11 +238,11 @@ func WithDistThr(value float32) Option {
 	}
 }
 
-// WithNSQ set nsq
-func WithNSQ(topic, channel string, nsqLookupURLs []string) Option {
+// WithMQ set mq
+func WithMQ(topic, groupPrefix string, mqAddrs []string) Option {
 	return func(opts *options) {
 		opts.cfg.Topic = topic
-		opts.cfg.Channel = channel
-		opts.cfg.NSQLookupURLs = nsqLookupURLs
+		opts.cfg.GroupPrefix = groupPrefix
+		opts.cfg.MQAddrs = mqAddrs
 	}
 }

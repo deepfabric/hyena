@@ -106,9 +106,9 @@ var (
 	distThr = flag.Float64("dist", 0.6, "vector distThr")
 
 	// about nsq
-	topic      = flag.String("nsq-topic", "", "NSQ: topic")
-	channel    = flag.String("nsq-channel", "", "NSQ: channel")
-	lookupURLs = flag.String("nsq-lookup", "", "NSQ: lookupURLs")
+	topic       = flag.String("mq-topic", "", "MQ: topic")
+	groupPrefix = flag.String("mq-group", "hyena-", "MQ: group prefix")
+	mqAddr      = flag.String("mq-addr", "", "MQ: mq addrs")
 
 	// about version
 	version = flag.Bool("version", false, "show version")
@@ -182,17 +182,17 @@ func parseOptions() []server.Option {
 	}
 
 	if *topic == "" {
-		fmt.Println("nsq topic must be set")
+		fmt.Println("mq topic must be set")
 		os.Exit(-1)
 	}
 
-	if *channel == "" {
-		fmt.Println("nsq channel must be set")
+	if *groupPrefix == "" {
+		fmt.Println("mq group prefix must be set")
 		os.Exit(-1)
 	}
 
-	if *lookupURLs == "" {
-		fmt.Println("nsq loopup urls must be set")
+	if *mqAddr == "" {
+		fmt.Println("mq address urls must be set")
 		os.Exit(-1)
 	}
 
@@ -284,7 +284,7 @@ func parseOptions() []server.Option {
 	opts = append(opts, server.WithRaftOption(raftstore.WithDim(*dim)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithFlatThr(*flatThr)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithDistThr(float32(*distThr))))
-	opts = append(opts, server.WithRaftOption(raftstore.WithNSQ(*topic, *channel, strings.Split(*lookupURLs, ","))))
+	opts = append(opts, server.WithRaftOption(raftstore.WithMQ(*topic, *groupPrefix, strings.Split(*mqAddr, ","))))
 	return opts
 }
 

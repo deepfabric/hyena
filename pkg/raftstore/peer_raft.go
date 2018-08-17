@@ -11,6 +11,7 @@ import (
 	pbutil "github.com/fagongzi/util/protoc"
 	"github.com/infinivision/hyena/pkg/pb/meta"
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
+	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 )
 
@@ -83,6 +84,16 @@ func (pr *PeerReplicate) addRequest(req *reqCtx) error {
 	return nil
 }
 
+func (pr *PeerReplicate) addRequestFromMQ(req interface{}) error {
+	err := pr.mqRequests.Put(req)
+	if err != nil {
+		return err
+	}
+
+	pr.addEvent()
+	return nil
+}
+
 func (pr *PeerReplicate) addApplyResult(result *asyncApplyResult) {
 	err := pr.applyResults.Put(result)
 	if err != nil {
@@ -145,6 +156,7 @@ func (pr *PeerReplicate) readyToServeRaft(ctx context.Context) {
 		pr.handleReport(items)
 		pr.handleApplyResult(items)
 		pr.handleRequest(items)
+		pr.handleRequestFromMQ(items)
 
 		if pr.rn.HasReadySince(pr.ps.lastReadyIndex) {
 			pr.handleReady()
@@ -342,6 +354,62 @@ func (pr *PeerReplicate) handleRequest(items []interface{}) {
 
 		pr.propose(pr.batching.pop())
 	}
+
+	if pr.requests.Len() > 0 {
+		pr.addEvent()
+	}
+}
+
+func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
+	size := pr.mqRequests.Len()
+	if size == 0 {
+		return
+	}
+
+	n, err := pr.mqRequests.Get(batch, items)
+	if err != nil {
+		return
+	}
+
+	vBatch := acquireVdbBatch()
+
+	// 1. batch added to local vectordb
+	committedOffset := int64(0)
+	for i := int64(0); i < n; i++ {
+		req := items[i].(*rpc.InsertRequest)
+		committedOffset = req.Offset
+		vBatch.append(req.Xbs, req.Ids)
+		util.ReleaseInsertReq(req)
+	}
+	pr.ps.vectorRecords += uint64(len(vBatch.xbs))
+
+	err = pr.ps.vdb.AddWithIds(vBatch.xbs, vBatch.ids)
+	if err != nil {
+		log.Fatalf("raftstore[db-%d]: batch insert failed, errors:%+v",
+			pr.id,
+			err)
+	}
+
+	log.Infof("raftstore[db-%d]: after added, %d records on committed offset %d",
+		pr.id,
+		pr.ps.vectorRecords,
+		committedOffset)
+
+	releaseVdbBatch(vBatch)
+
+	// 2. update the committed offset and notify all waitting search request
+	pr.ps.setCommittedOffset(committedOffset)
+	err = pr.store.metaStore.Set(getRaftApplyStateKey(pr.id), pbutil.MustMarshal(&pr.ps.raftApplyState), false)
+	if err != nil {
+		log.Fatalf("raftstore[db-%d]: save apply context failed, errors:\n %+v",
+			pr.id,
+			err)
+	}
+	pr.cond.Broadcast()
+
+	// 3. check split and stop the mq consumer, close the mqRequests queue,
+	// so the old peer cann't be consumer new request
+	pr.maybeSplit()
 
 	if pr.requests.Len() > 0 {
 		pr.addEvent()
@@ -782,6 +850,7 @@ func (ps *peerStorage) doAppendSnap(ctx *readyContext, snap etcdraftpb.Snapshot)
 
 	ctx.raftState.LastIndex = lastIndex
 	ctx.applyState.AppliedIndex = lastIndex
+	ctx.applyState.CommittedOffset = ctx.snap.Header.CommittedOffset
 	ctx.lastTerm = lastTerm
 
 	// The snapshot only contains log which index > applied index, so
@@ -866,7 +935,8 @@ func (pr *PeerReplicate) doSaveApplyState(ctx *readyContext) {
 
 	if readyState.AppliedIndex != origin.AppliedIndex ||
 		readyState.TruncatedState.Index != origin.TruncatedState.Index ||
-		readyState.TruncatedState.Term != origin.TruncatedState.Term {
+		readyState.TruncatedState.Term != origin.TruncatedState.Term ||
+		readyState.CommittedOffset != origin.CommittedOffset {
 		err := ctx.wb.Set(getRaftApplyStateKey(pr.id), pbutil.MustMarshal(&readyState))
 		if err != nil {
 			log.Fatalf("raftstore[db-%d]: handle raft ready failure, errors:\n %+v",
@@ -988,6 +1058,8 @@ func (pr *PeerReplicate) doPollApply(result *asyncApplyResult) {
 	if result.result != nil {
 		pr.store.doPostApplyResult(result)
 	}
+
+	pr.maybeSplit()
 }
 
 func (pr *PeerReplicate) doPostApply(result *asyncApplyResult) {
@@ -1004,14 +1076,26 @@ func (pr *PeerReplicate) doPostApply(result *asyncApplyResult) {
 	log.Debugf("raftstore[db-%d]: async apply committied entries finished, applied=<%d>",
 		pr.id,
 		result.applyState.AppliedIndex)
+}
 
-	if pr.isLeader() && !pr.ps.inAsking && pr.ps.vectorRecords > pr.store.cfg.MaxDBRecords {
-		pr.ps.inAsking = true
-		err := pr.startAskSplitJob(pr.ps.db)
-		if err != nil {
-			log.Fatalf("raftstore[db-%d]: add ask split job failed, errors:",
+func (pr *PeerReplicate) maybeSplit() {
+	if pr.ps.vectorRecords > pr.store.cfg.MaxDBRecords {
+		pr.maybeStopConsumer()
+
+		if pr.isLeader() && !pr.ps.inAsking && pr.isWritable() {
+			log.Infof("raftstore[db-%d]: %d reach the maximum limit %d per db, split at committedOffset %d. %+v",
 				pr.id,
-				err)
+				pr.ps.vectorRecords,
+				pr.store.cfg.MaxDBRecords,
+				pr.ps.db,
+				pr.ps.committedOffset())
+			pr.ps.inAsking = true
+			err := pr.startAskSplitJob(pr.ps.db, pr.ps.committedOffset())
+			if err != nil {
+				log.Fatalf("raftstore[db-%d]: add ask split job failed, errors:",
+					pr.id,
+					err)
+			}
 		}
 	}
 }
@@ -1114,8 +1198,6 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 		s.addPeerToCache(*p)
 	}
 
-	pr.maybeStopConsumer()
-
 	newDBID := newDB.ID
 	newPR := s.getDB(newDBID, false)
 	if nil != newPR {
@@ -1123,13 +1205,13 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 			s.addPeerToCache(*p)
 		}
 
-		// If the store received a raft msg with the new region raft group
+		// If the store received a raft msg with the new db raft group
 		// before splitting, it will creates a uninitialized peer.
 		// We can remove this uninitialized peer directly.
 		if newPR.ps.isInitialized() {
-			log.Fatalf("raftstore[db-%d]: duplicated db for split, newCellID=<%d>",
+			log.Fatalf("raftstore[db-%d]: duplicated db for split, exists newDB=<%+v>",
 				id,
-				newDBID)
+				newPR.ps.db)
 		}
 	}
 

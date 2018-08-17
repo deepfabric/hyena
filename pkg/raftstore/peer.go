@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	cluster "github.com/bsm/sarama-cluster"
 	"github.com/coreos/etcd/raft"
 	"github.com/fagongzi/log"
 	"github.com/infinivision/hyena/pkg/pb/meta"
@@ -12,7 +13,6 @@ import (
 	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 	"github.com/infinivision/prophet"
-	"github.com/youzan/go-nsq"
 )
 
 type reqCtx struct {
@@ -49,6 +49,7 @@ type PeerReplicate struct {
 	reports         *util.Queue
 	applyResults    *util.Queue
 	requests        *util.Queue
+	mqRequests      *util.Queue
 	actions         *util.Queue
 	stopRaftTick    bool
 	raftLogSizeHint uint64
@@ -57,11 +58,10 @@ type PeerReplicate struct {
 
 	cancelTaskIds []uint64
 
-	consumer        *nsq.Consumer
-	nsqRequests     *util.RingBuffer
-	condL           *sync.Mutex
-	cond            *sync.Cond
-	consumerRunning bool
+	consumerCloseOnce, consumerStartOnce sync.Once
+	consumer                             *cluster.Consumer
+	condL                                *sync.Mutex
+	cond                                 *sync.Cond
 }
 
 func createPeerReplicate(store *Store, db *meta.VectorDB) (*PeerReplicate, error) {
@@ -113,6 +113,7 @@ func newPeerReplicate(store *Store, db *meta.VectorDB, peerID uint64) (*PeerRepl
 	pr.reports = util.New(0)
 	pr.applyResults = util.New(0)
 	pr.requests = util.New(0)
+	pr.mqRequests = util.New(0)
 	pr.actions = util.New(0)
 	pr.heartbeatsMap = &sync.Map{}
 	pr.batching = newBatching(pr)
@@ -123,9 +124,16 @@ func newPeerReplicate(store *Store, db *meta.VectorDB, peerID uint64) (*PeerRepl
 		return nil, err
 	}
 	pr.rn = rn
-	err = pr.tryCampaign()
-	if err != nil {
-		return nil, err
+
+	// If this db has only one peer and I am the one, campaign directly.
+	if len(db.Peers) == 1 && db.Peers[0].StoreID == store.meta.ID {
+		err = rn.Campaign()
+		if err != nil {
+			return nil, err
+		}
+
+		log.Debugf("raftstore[db-%d]: try to campaign leader",
+			pr.id)
 	}
 
 	id, _ := store.runner.RunCancelableTask(pr.readyToServeRaft)
@@ -145,7 +153,7 @@ func (pr *PeerReplicate) maybeCampaign() (bool, error) {
 		return false, err
 	}
 
-	log.Debugf("raftstore[db-%d]: try to campaign leader",
+	log.Debugf("raftstore[%d]: try to campaign leader",
 		pr.id)
 	return true, nil
 }
@@ -173,6 +181,7 @@ func (pr *PeerReplicate) destroy() error {
 	log.Infof("raftstore[db-%d]: begin to destroy",
 		pr.id)
 
+	pr.maybeStopConsumer()
 	pr.stopEventLoop()
 	pr.store.removeDroppedVoteMsg(pr.id)
 	wb := pr.store.metaStore.NewWriteBatch()
