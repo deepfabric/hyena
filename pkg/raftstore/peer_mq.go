@@ -110,8 +110,7 @@ func (pr *PeerReplicate) doStartConsumerLoops() {
 				req.Offset = message.Offset
 				pr.addRequestFromMQ(req)
 			} else if req, ok := msg.(*rpc.UpdateRequest); ok {
-				// TODO: do udate in async, not use raft process
-				pr.onUpdate(req, nil, nil)
+				pr.mqUpdateRequests.Put(req)
 			}
 
 			pr.consumer.MarkOffset(message, "")

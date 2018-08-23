@@ -42,17 +42,18 @@ type PeerReplicate struct {
 	ps       *peerStorage
 	batching *batching
 
-	rn              *raft.RawNode
-	events          *util.RingBuffer
-	ticks           *util.Queue
-	steps           *util.Queue
-	reports         *util.Queue
-	applyResults    *util.Queue
-	requests        *util.Queue
-	mqRequests      *util.Queue
-	actions         *util.Queue
-	stopRaftTick    bool
-	raftLogSizeHint uint64
+	rn               *raft.RawNode
+	events           *util.RingBuffer
+	ticks            *util.Queue
+	steps            *util.Queue
+	reports          *util.Queue
+	applyResults     *util.Queue
+	requests         *util.Queue
+	mqRequests       *util.Queue
+	mqUpdateRequests *util.Queue
+	actions          *util.Queue
+	stopRaftTick     bool
+	raftLogSizeHint  uint64
 
 	heartbeatsMap *sync.Map
 
@@ -115,6 +116,7 @@ func newPeerReplicate(store *Store, db *meta.VectorDB, peerID uint64) (*PeerRepl
 	pr.requests = util.New(0)
 	pr.mqRequests = util.New(0)
 	pr.actions = util.New(0)
+	pr.mqUpdateRequests = util.New(0)
 	pr.heartbeatsMap = &sync.Map{}
 	pr.batching = newBatching(pr)
 
@@ -137,6 +139,9 @@ func newPeerReplicate(store *Store, db *meta.VectorDB, peerID uint64) (*PeerRepl
 	}
 
 	id, _ := store.runner.RunCancelableTask(pr.readyToServeRaft)
+	pr.cancelTaskIds = append(pr.cancelTaskIds, id)
+
+	id, _ = store.runner.RunCancelableTask(pr.asyncExecUpdates)
 	pr.cancelTaskIds = append(pr.cancelTaskIds, id)
 
 	return pr, nil

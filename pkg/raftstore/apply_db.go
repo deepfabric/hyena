@@ -1,10 +1,16 @@
 package raftstore
 
 import (
+	"context"
+
 	"github.com/fagongzi/log"
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
 	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
+)
+
+const (
+	updateBatch = 512
 )
 
 type vdbBatch struct {
@@ -83,5 +89,47 @@ func (pr *PeerReplicate) execSearch(req *rpc.SearchRequest, cb func(interface{})
 	if err != nil {
 		cbErr(req.ID, errorOtherCMDResp(err))
 		return
+	}
+
+	rsp := util.AcquireSearchRsp()
+	rsp.ID = req.ID
+	rsp.Distances = ds
+	rsp.Xids = ids
+	rsp.DB = pr.id
+	cb(rsp)
+}
+
+func (pr *PeerReplicate) asyncExecUpdates(ctx context.Context) {
+	items := make([]interface{}, updateBatch, updateBatch)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Infof("raftstore[db-%d]: handle update requests stopped",
+				pr.id)
+			return
+		default:
+			n, err := pr.mqUpdateRequests.Get(updateBatch, items)
+			if err != nil {
+				continue
+			}
+
+			batchReq := util.AcquireUpdateReq()
+			for i := int64(0); i < n; i++ {
+				req := items[i].(*rpc.UpdateRequest)
+				batchReq.Xbs = append(batchReq.Xbs, req.Xbs...)
+				batchReq.Ids = append(batchReq.Ids, req.Ids...)
+				util.ReleaseUpdateReq(req)
+			}
+
+			err = pr.ps.vdb.UpdateWithIds(batchReq.Xbs, batchReq.Ids)
+			if err != nil {
+				log.Errorf("raftstore[db-%d]: exec update failed: %+v",
+					pr.id,
+					err)
+				return
+			}
+			util.ReleaseUpdateReq(batchReq)
+		}
 	}
 }

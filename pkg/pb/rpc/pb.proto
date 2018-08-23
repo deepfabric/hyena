@@ -30,9 +30,10 @@ message SearchRequest {
 
 // SearchResponse search response
 message SearchResponse {
-    optional bytes id        = 1 [(gogoproto.customname) = "ID"];
-    repeated float distances = 2;
-    repeated int64 xids      = 3;
+    optional bytes  id        = 1 [(gogoproto.customname) = "ID"];
+    repeated float  distances = 2;
+    repeated int64  xids      = 3;
+    optional uint64 db        = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
 }
 
 // InsertRequest insert request
