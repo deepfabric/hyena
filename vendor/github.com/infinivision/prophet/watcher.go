@@ -122,9 +122,10 @@ func newLeaderChangerEvent(target, leader uint64) *EventNotify {
 	value.WriteUint64(target)
 	value.WriteUint64(leader)
 
+	_, data, _ := value.ReadAll()
 	nt := &EventNotify{
 		Event: EventResourceLeaderChanged,
-		Value: value.RawBuf()[0:value.Readable()],
+		Value: data,
 	}
 	value.Release()
 	return nt

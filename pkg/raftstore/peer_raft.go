@@ -381,7 +381,7 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 		vBatch.append(req.Xbs, req.Ids)
 		util.ReleaseInsertReq(req)
 	}
-	pr.ps.vectorRecords += uint64(len(vBatch.xbs))
+	pr.ps.vectorRecords += uint64(len(vBatch.ids))
 
 	err = pr.ps.vdb.AddWithIds(vBatch.xbs, vBatch.ids)
 	if err != nil {
@@ -390,7 +390,7 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 			err)
 	}
 
-	log.Infof("raftstore[db-%d]: after added, %d records on committed offset %d",
+	log.Debugf("raftstore[db-%d]: after added, %d records on committed offset %d",
 		pr.id,
 		pr.ps.vectorRecords,
 		committedOffset)
@@ -1193,18 +1193,9 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 	pr.ps.db = oldDB
 	pr.ps.inAsking = false
 
-	// add new cell peers to cache
-	for _, p := range newDB.Peers {
-		s.addPeerToCache(*p)
-	}
-
 	newDBID := newDB.ID
 	newPR := s.getDB(newDBID, false)
 	if nil != newPR {
-		for _, p := range newDB.Peers {
-			s.addPeerToCache(*p)
-		}
-
 		// If the store received a raft msg with the new db raft group
 		// before splitting, it will creates a uninitialized peer.
 		// We can remove this uninitialized peer directly.
@@ -1212,6 +1203,10 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 			log.Fatalf("raftstore[db-%d]: duplicated db for split, exists newDB=<%+v>",
 				id,
 				newPR.ps.db)
+		}
+
+		for _, p := range newDB.Peers {
+			s.addPeerToCache(*p)
 		}
 	}
 

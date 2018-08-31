@@ -49,15 +49,25 @@ func (r *router) start() {
 		case prophet.EventInit:
 			r.updateAll(evt)
 		case prophet.EventResourceCreated:
-			r.addDB(parseDB(evt.Value), true)
+			db := parseDB(evt.Value)
+			log.Debugf("event: db %d created", db.ID)
+			r.addDB(db, true)
 		case prophet.EventResourceChaned:
-			r.updateDB(parseDB(evt.Value))
+			db := parseDB(evt.Value)
+			log.Debugf("event: db %d changed", db.ID)
+			r.updateDB(db)
 		case prophet.EventResourceLeaderChanged:
-			r.updateLeader(evt.ReadLeaderChangerValue())
+			db, newLeader := evt.ReadLeaderChangerValue()
+			log.Debugf("event: db %d leader changer to peer %d", db, newLeader)
+			r.updateLeader(db, newLeader)
 		case prophet.EventContainerCreated:
-			r.addStore(parseStore(evt.Value), true)
+			store := parseStore(evt.Value)
+			log.Debugf("event: store %d created", store.ID)
+			r.addStore(store, true)
 		case prophet.EventContainerChanged:
-			r.updateStore(parseStore(evt.Value))
+			store := parseStore(evt.Value)
+			log.Debugf("event: store %d changed", store.ID)
+			r.updateStore(store)
 		}
 	}
 }

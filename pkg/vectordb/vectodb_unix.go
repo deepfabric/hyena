@@ -42,20 +42,20 @@ type db struct {
 
 func (d *db) UpdateWithIds(extXb []float32, extXids []int64) error {
 	d.Lock()
-	err := d.vdb.UpdateWithIds(len(extXids), extXb, extXids)
+	err := d.vdb.UpdateWithIds(extXb, extXids)
 	d.Unlock()
 	return err
 }
 
 func (d *db) AddWithIds(newXb []float32, newXids []int64) error {
 	d.Lock()
-	err := d.vdb.AddWithIds(len(newXids), newXb, newXids)
+	err := d.vdb.AddWithIds(newXb, newXids)
 	d.Unlock()
 	return err
 }
 
 func (d *db) Search(xq, distances []float32, xids []int64) (int, error) {
-	return d.vdb.Search(len(xq), xq, distances, xids)
+	return d.vdb.Search(xq, distances, xids)
 }
 
 func (d *db) UpdateIndex() error {

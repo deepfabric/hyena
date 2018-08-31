@@ -277,6 +277,9 @@ func getResourceHB(pr *PeerReplicate) *prophet.ResourceHeartbeatReq {
 	req.LeaderPeer = &prophet.Peer{ID: pr.peer.ID, ContainerID: pr.peer.StoreID}
 	req.DownPeers = pr.collectDownPeers(pr.store.cfg.MaxPeerDownTime)
 	req.PendingPeers = pr.collectPendingPeers()
-
+	log.Infof("raftstore[db-%d]: db: %+v, leader: %+v",
+		pr.id,
+		req.Resource,
+		req.LeaderPeer)
 	return req
 }
