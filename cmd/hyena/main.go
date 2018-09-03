@@ -277,7 +277,7 @@ func parseOptions() []server.Option {
 	opts = append(opts, server.WithRaftOption(raftstore.WithSentSnapWorkerCount(*sentSnapWorkerCount)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithApplyWorkerCount(*applyWorkerCount)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithLimitSnapChunkRate(*limitSnapChunkRate)))
-	opts = append(opts, server.WithRaftOption(raftstore.WithLimitSnapChunkBytes(*limitSnapChunkBytesKB*mb)))
+	opts = append(opts, server.WithRaftOption(raftstore.WithLimitSnapChunkBytes(*limitSnapChunkBytesKB*kb)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithStoreHBInterval(time.Second*time.Duration(*storeHBIntervalSec))))
 	opts = append(opts, server.WithRaftOption(raftstore.WithDBHBInterval(time.Second*time.Duration(*dbHBIntervalSec))))
 	opts = append(opts, server.WithRaftOption(raftstore.WithMaxPeerDownTime(time.Second*time.Duration(*maxPeerDownTimeSec))))

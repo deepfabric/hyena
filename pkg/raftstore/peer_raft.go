@@ -1200,9 +1200,9 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 		// before splitting, it will creates a uninitialized peer.
 		// We can remove this uninitialized peer directly.
 		if newPR.ps.isInitialized() {
-			log.Fatalf("raftstore[db-%d]: duplicated db for split, exists newDB=<%+v>",
-				id,
-				newPR.ps.db)
+			log.Warnf("raftstore[db-%d]: new db created by raft message before apply split, drop it and create again",
+				newPR.id)
+			newPR.destroy()
 		}
 
 		for _, p := range newDB.Peers {
