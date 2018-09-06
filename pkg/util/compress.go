@@ -2,7 +2,6 @@ package util
 
 import (
 	"archive/tar"
-	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
@@ -23,9 +22,9 @@ func GZIPTo(path string, dest string) error {
 
 	d, _ := os.Create(dest)
 	defer d.Close()
-	gw := gzip.NewWriter(d)
-	defer gw.Close()
-	tw := tar.NewWriter(gw)
+	// gw := gzip.NewWriter(d)
+	// defer gw.Close()
+	tw := tar.NewWriter(d)
 	defer tw.Close()
 
 	return compress(file, "", tw)
@@ -82,12 +81,12 @@ func deCompress(tarFile, dest string) error {
 		return err
 	}
 	defer srcFile.Close()
-	gr, err := gzip.NewReader(srcFile)
-	if err != nil {
-		return err
-	}
-	defer gr.Close()
-	tr := tar.NewReader(gr)
+	// gr, err := gzip.NewReader(srcFile)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer gr.Close()
+	tr := tar.NewReader(srcFile)
 	for {
 		hdr, err := tr.Next()
 		if err != nil {

@@ -102,7 +102,7 @@ func (pa *ProphetAdapter) ChangeLeader(resourceID uint64, newLeader *prophet.Pee
 		log.Fatal("bug: db can'not be nil")
 	}
 
-	log.Infof("raftstore[db-%d]: try to transfer leader, from=<%v> to=<%+v>",
+	log.Debugf("raftstore[db-%d]: try to transfer leader, from=<%v> to=<%+v>",
 		pr.id,
 		pr.id,
 		newLeader.ID)
@@ -137,7 +137,7 @@ func (pa *ProphetAdapter) ChangePeer(resourceID uint64, peer *prophet.Peer, chan
 		StoreID: peer.ContainerID,
 	}
 
-	log.Infof("raftstore[db-%d]: try to change peer, type=<%s> peer=<%v>",
+	log.Debugf("raftstore[db-%d]: try to change peer, type=<%s> peer=<%v>",
 		pr.id,
 		ct.String(),
 		p)
@@ -277,9 +277,5 @@ func getResourceHB(pr *PeerReplicate) *prophet.ResourceHeartbeatReq {
 	req.LeaderPeer = &prophet.Peer{ID: pr.peer.ID, ContainerID: pr.peer.StoreID}
 	req.DownPeers = pr.collectDownPeers(pr.store.cfg.MaxPeerDownTime)
 	req.PendingPeers = pr.collectPendingPeers()
-	log.Infof("raftstore[db-%d]: db: %+v, leader: %+v",
-		pr.id,
-		req.Resource,
-		req.LeaderPeer)
 	return req
 }
