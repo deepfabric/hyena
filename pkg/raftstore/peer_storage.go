@@ -575,7 +575,7 @@ func (ps *peerStorage) Snapshot() (etcdraftpb.Snapshot, error) {
 		ps.db.Epoch)
 	ps.snapTriedCnt++
 
-	err := ps.store.addApplyJob(ps.db.ID, "doGenSnapJob", ps.doGenSnapJob, ps.setGenSnapJob)
+	err := ps.store.addGenSnapJob(ps.doGenSnapJob, ps.setGenSnapJob)
 	if err != nil {
 		log.Fatalf("raftstore[db-%d]: add generate job failed, errors:\n %+v",
 			ps.db.ID,

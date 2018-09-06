@@ -382,6 +382,10 @@ func (s *Store) addSplitJob(task func() error) error {
 	return s.addNamedJob("", splitWorker, task)
 }
 
+func (s *Store) addGenSnapJob(task func() error, cb func(*task.Job)) error {
+	return s.addNamedJobWithCB("", genSnapWorker, task, cb)
+}
+
 func (s *Store) addNamedJob(desc, worker string, task func() error) error {
 	return s.runner.RunJobWithNamedWorker(desc, worker, task)
 }

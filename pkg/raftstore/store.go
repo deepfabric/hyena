@@ -19,6 +19,7 @@ import (
 
 const (
 	applyWorker      = "apply-worker-%d"
+	genSnapWorker    = "gen-snap-worker"
 	splitWorker      = "split-worker"
 	prophetWorker    = "prophet-worker"
 	logCompactWorker = "log-compact-worker"
@@ -85,6 +86,7 @@ func NewStoreWithCfg(meta meta.Store, cfg *Cfg) *Store {
 	s.runner.AddNamedWorker(prophetWorker)
 	s.runner.AddNamedWorker(splitWorker)
 	s.runner.AddNamedWorker(logCompactWorker)
+	s.runner.AddNamedWorker(genSnapWorker)
 
 	return s
 }

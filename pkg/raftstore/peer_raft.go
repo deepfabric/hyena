@@ -25,7 +25,7 @@ const (
 
 var (
 	emptyStruct                         = struct{}{}
-	batch                        int64  = 64
+	batch                        int64  = 32
 	maxTransferLeaderAllowLogLag uint64 = 10
 )
 
@@ -366,6 +366,12 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 		return
 	}
 
+	// If we are create snapshot, skip handle request
+	if size > 0 && pr.ps.genSnapJob != nil && pr.ps.genSnapJob.IsNotComplete() {
+		pr.addEvent()
+		return
+	}
+
 	n, err := pr.mqRequests.Get(batch, items)
 	if err != nil {
 		return
@@ -375,6 +381,7 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 
 	// 1. batch added to local vectordb
 	committedOffset := int64(0)
+	// TODO: make sure batch + already inserted == MaxRecords
 	for i := int64(0); i < n; i++ {
 		req := items[i].(*rpc.InsertRequest)
 		committedOffset = req.Offset
@@ -438,9 +445,10 @@ func (pr *PeerReplicate) handleReady() {
 	}
 
 	rd := pr.rn.ReadySince(pr.ps.lastReadyIndex)
-	log.Debugf("raftstore[db-%d]: raft ready after %d",
+	log.Debugf("raftstore[db-%d]: raft ready after %d, %+v",
 		pr.id,
-		pr.ps.lastReadyIndex)
+		pr.ps.lastReadyIndex,
+		rd)
 
 	ctx := acquireReadyContext()
 	// If snapshot is received, further handling
@@ -1079,7 +1087,7 @@ func (pr *PeerReplicate) doPostApply(result *asyncApplyResult) {
 }
 
 func (pr *PeerReplicate) maybeSplit() {
-	if pr.ps.vectorRecords > pr.store.cfg.MaxDBRecords {
+	if pr.ps.vectorRecords >= pr.store.cfg.MaxDBRecords {
 		pr.maybeStopConsumer()
 
 		if pr.isLeader() && !pr.ps.inAsking && pr.isWritable() {
@@ -1154,6 +1162,10 @@ func (s *Store) doApplyConfChange(id uint64, cp *changePeer) {
 			}
 		}
 	}
+
+	if pr.isLeader() {
+		pr.addRequest(acquireReqCtx())
+	}
 }
 
 func (s *Store) doApplyCompactRaftLog(id uint64, result *compactLogResult) {
@@ -1204,10 +1216,10 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 				newPR.id)
 			newPR.destroy()
 		}
+	}
 
-		for _, p := range newDB.Peers {
-			s.addPeerToCache(*p)
-		}
+	for _, p := range newDB.Peers {
+		s.addPeerToCache(*p)
 	}
 
 	newPR, err := createPeerReplicate(s, &newDB)
