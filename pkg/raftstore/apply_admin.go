@@ -126,6 +126,7 @@ func (d *applyDelegate) doExecSplit(ctx *applyContext) (*execResult, error) {
 	d.db.State = meta.RU
 	d.db.Epoch.Version++
 	newDB.Epoch.Version = d.db.Epoch.Version
+	newDB.Start = d.db.Start + d.store.cfg.MaxDBRecords
 
 	err := d.ps.updatePeerState(d.db, raftpb.Normal, ctx.wb)
 	wb := d.ps.store.metaStore.NewWriteBatch()

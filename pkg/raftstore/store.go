@@ -385,6 +385,17 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 		return false
 	}
 
+	// check range overlapped
+	// if we have the writeable db, and has overlapped with new db, we cann't create the replicate
+	pr := s.getWriteableDB()
+	if pr != nil && pr.ps.db.Start+s.cfg.MaxDBRecords == msg.Start {
+		log.Infof("raftstore[db-%d]: overlapped with %d, [%d,%d)",
+			pr.id,
+			pr.ps.db.Start,
+			msg.Start)
+		return false
+	}
+
 	// now we can create a replicate
 	// the create replicate will not start the mq consumer now
 	// it will started at after apply the snapshot

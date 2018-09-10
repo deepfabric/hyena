@@ -42,6 +42,7 @@ message Epoch {
 message VectorDB {
     optional uint64  id    = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
     optional DBState state = 2 [(gogoproto.nullable) = false];
+    optional uint64  start = 3 [(gogoproto.nullable) = false];
     optional Epoch   epoch = 4 [(gogoproto.nullable) = false];
     repeated Peer    peers = 5 [(gogoproto.nullable) = true];
 }

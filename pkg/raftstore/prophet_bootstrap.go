@@ -99,6 +99,7 @@ func (s *Store) createFirstDB() meta.VectorDB {
 	db := meta.VectorDB{
 		ID:    s.allocID(),
 		State: meta.RWU,
+		Start: 0,
 	}
 	db.Peers = append(db.Peers, &meta.Peer{
 		ID:      s.allocID(),

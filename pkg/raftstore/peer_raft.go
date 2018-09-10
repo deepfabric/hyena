@@ -1212,9 +1212,8 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 		// before splitting, it will creates a uninitialized peer.
 		// We can remove this uninitialized peer directly.
 		if newPR.ps.isInitialized() {
-			log.Warnf("raftstore[db-%d]: new db created by raft message before apply split, drop it and create again",
+			log.Fatalf("raftstore[db-%d]: new db created by raft message before apply split, drop it and create again",
 				newPR.id)
-			newPR.destroy()
 		}
 	}
 
@@ -1287,6 +1286,7 @@ func (pr *PeerReplicate) sendRaftMsg(msg etcdraftpb.Message) error {
 	sendMsg := util.AcquireRaftMessage()
 	sendMsg.ID = pr.id
 	sendMsg.Epoch = pr.ps.db.Epoch
+	sendMsg.Start = pr.ps.db.Start
 
 	sendMsg.From = pr.peer
 	toPeer, ok := pr.store.peers.Load(msg.To)
