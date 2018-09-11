@@ -428,7 +428,7 @@ func (pr *PeerReplicate) handleReady() {
 	// leader will send all the remaining messages to this follower, which can lead
 	// to full message queue under high load.
 	if pr.ps.isApplyingSnap() {
-		log.Infof("raftstore[db-%d]: still applying snapshot, skip further handling",
+		log.Debugf("raftstore[db-%d]: still applying snapshot, skip further handling",
 			pr.id)
 		return
 	}
@@ -478,6 +478,7 @@ func (pr *PeerReplicate) handleReady() {
 				pr.id)
 			pr.store.pd.GetRPC().TiggerResourceHeartbeat(pr.id)
 			pr.resetBatching()
+			pr.maybeSplit()
 		}
 
 		// now we are join in the raft group, bootstrap the mq consumer to process insert requests
@@ -1098,9 +1099,10 @@ func (pr *PeerReplicate) maybeSplit() {
 				pr.ps.db,
 				pr.ps.committedOffset())
 			pr.ps.inAsking = true
+
 			err := pr.startAskSplitJob(pr.ps.db, pr.ps.committedOffset())
 			if err != nil {
-				log.Fatalf("raftstore[db-%d]: add ask split job failed, errors:",
+				log.Fatalf("raftstore[db-%d]: add ask split job failed, errors: %+v",
 					pr.id,
 					err)
 			}
@@ -1199,12 +1201,16 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 			id)
 	}
 
-	oldDB := result.oldDB
-	newDB := result.newDB
-
-	pr.ps.db = oldDB
 	pr.ps.inAsking = false
 
+	if !result.valid {
+		pr.maybeSplit()
+		return
+	}
+
+	oldDB := result.oldDB
+	newDB := result.newDB
+	pr.ps.db = oldDB
 	newDBID := newDB.ID
 	newPR := s.getDB(newDBID, false)
 	if nil != newPR {
@@ -1287,6 +1293,7 @@ func (pr *PeerReplicate) sendRaftMsg(msg etcdraftpb.Message) error {
 	sendMsg.ID = pr.id
 	sendMsg.Epoch = pr.ps.db.Epoch
 	sendMsg.Start = pr.ps.db.Start
+	sendMsg.DBState = pr.ps.db.State
 
 	sendMsg.From = pr.peer
 	toPeer, ok := pr.store.peers.Load(msg.To)

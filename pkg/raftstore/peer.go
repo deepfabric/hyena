@@ -88,6 +88,7 @@ func doReplicate(store *Store, msg *raftpb.RaftMessage, peerID uint64) (*PeerRep
 	db := &meta.VectorDB{
 		ID:    msg.ID,
 		Epoch: msg.Epoch,
+		State: msg.DBState,
 	}
 
 	return newPeerReplicate(store, db, peerID)

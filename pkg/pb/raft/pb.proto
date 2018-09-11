@@ -50,8 +50,9 @@ message RaftMessage  {
     optional meta.Peer      to        = 3 [(gogoproto.nullable) = false];
     optional meta.Epoch     epoch     = 4 [(gogoproto.nullable) = false];
     optional uint64         start     = 5 [(gogoproto.nullable) = false];
-    optional bool           tombstone = 6 [(gogoproto.nullable) = false];
-    optional raftpb.Message message   = 7 [(gogoproto.nullable) = false];
+    optional meta.DBState   dbState   = 6 [(gogoproto.nullable) = false, (gogoproto.customname) = "DBState"];
+    optional bool           tombstone = 7 [(gogoproto.nullable) = false];
+    optional raftpb.Message message   = 8 [(gogoproto.nullable) = false];
 }
 
 // SnapshotMessageHeader snapshot header

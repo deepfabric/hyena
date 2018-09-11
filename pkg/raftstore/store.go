@@ -165,7 +165,7 @@ func (s *Store) startDBs() {
 
 		if localState.State == raftpb.Applying {
 			applyingCount++
-			log.Infof("raftstore[db-%d]: db %d is applying in store", id)
+			log.Infof("raftstore[db-%d]: applying in store", id)
 			pr.startApplySnapJob()
 		}
 
@@ -387,10 +387,11 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 
 	// check range overlapped
 	// if we have the writeable db, and has overlapped with new db, we cann't create the replicate
-	pr := s.getWriteableDB()
-	if pr != nil && pr.ps.db.Start+s.cfg.MaxDBRecords == msg.Start {
+	pr := s.getWriteableDB(false)
+	if pr != nil && pr.ps.db.Start+s.cfg.MaxDBRecords <= msg.Start {
 		log.Infof("raftstore[db-%d]: overlapped with %d, [%d,%d)",
 			pr.id,
+			msg.Start,
 			pr.ps.db.Start,
 			msg.Start)
 		return false
@@ -418,7 +419,7 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 
 	log.Infof("raftstore[db-%d]: created by raft msg: %+v",
 		peerReplicate.id,
-		message)
+		msg)
 	return true
 }
 
@@ -612,11 +613,13 @@ func (s *Store) addPeerToCache(peer meta.Peer) {
 	s.peers.Store(peer.ID, peer)
 }
 
-func (s *Store) getWriteableDB() *PeerReplicate {
+func (s *Store) getWriteableDB(leader bool) *PeerReplicate {
 	var pr *PeerReplicate
 	s.replicates.Range(func(key, value interface{}) bool {
 		p := value.(*PeerReplicate)
-		if p.isWritable() && p.isLeader() {
+		if p.isWritable() &&
+			(!leader ||
+				(leader && p.isLeader())) {
 			pr = p
 			return false
 		}
@@ -706,7 +709,7 @@ func (s *Store) validateDB(req *raftpb.RaftCMDRequest) *raftpb.Error {
 	}
 
 	if !checkEpoch(pr.ps.db, req) {
-		wp := s.getWriteableDB()
+		wp := s.getWriteableDB(true)
 		if wp != nil {
 			return errorStaleEpochResp(wp.ps.db)
 		}

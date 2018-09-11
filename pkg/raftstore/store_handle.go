@@ -18,7 +18,7 @@ func (s *Store) HandleSearch(req *rpc.SearchRequest, cb func(interface{}), cbErr
 
 // HandleInsert handle insert request
 func (s *Store) HandleInsert(req *rpc.InsertRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
-	pr := s.getWriteableDB()
+	pr := s.getWriteableDB(true)
 	if nil == pr {
 		cbErr(req.ID, errorDBNotFound(0))
 		return

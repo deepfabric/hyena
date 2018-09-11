@@ -49,6 +49,7 @@ type changePeer struct {
 }
 
 type splitResult struct {
+	valid bool
 	oldDB meta.VectorDB
 	newDB meta.VectorDB
 }

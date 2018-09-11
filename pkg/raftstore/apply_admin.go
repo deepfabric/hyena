@@ -97,13 +97,18 @@ func (d *applyDelegate) doExecChangePeer(ctx *applyContext) (*execResult, error)
 func (d *applyDelegate) doExecSplit(ctx *applyContext) (*execResult, error) {
 	req := ctx.req.Admin.Split
 
+	result := &execResult{
+		adminType:   raftpb.Split,
+		splitResult: &splitResult{},
+	}
+
 	if len(req.NewPeerIDs) != len(d.db.Peers) {
 		log.Errorf("raftstore[db-%d]: invalid new peer id count, splitCount=<%d> currentCount=<%d>",
 			d.db.ID,
 			len(req.NewPeerIDs),
 			len(d.db.Peers))
-
-		return nil, nil
+		result.splitResult.valid = false
+		return result, nil
 	}
 
 	log.Infof("raftstore[db-%d]: exec split, db=<%+v>",
@@ -158,13 +163,9 @@ func (d *applyDelegate) doExecSplit(ctx *applyContext) (*execResult, error) {
 		},
 	})
 
-	result := &execResult{
-		adminType: raftpb.Split,
-		splitResult: &splitResult{
-			oldDB: d.db,
-			newDB: newDB,
-		},
-	}
+	result.splitResult.valid = true
+	result.splitResult.oldDB = d.db
+	result.splitResult.newDB = newDB
 
 	return result, nil
 }
