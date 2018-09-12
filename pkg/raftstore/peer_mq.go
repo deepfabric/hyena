@@ -18,7 +18,8 @@ func (pr *PeerReplicate) maybeStartConsumer() {
 			config.Group.Return.Notifications = true
 			config.Consumer.Return.Errors = true
 
-			err := util.PatchSaramaOffset(config, pr.ps.committedOffset())
+			offset, index := pr.ps.committedOffset()
+			err := util.PatchSaramaOffset(config, offset, index)
 			if err != nil {
 				log.Fatalf("raftstore[%d]: start mq consumer failed: %+v",
 					pr.id,

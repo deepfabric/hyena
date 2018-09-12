@@ -32,9 +32,10 @@ message RaftLocalState {
 
 // RaftApplyState raft apply state
 message RaftApplyState {
-    optional int64              committedOffset = 1 [(gogoproto.nullable) = false];
-    optional uint64             appliedIndex    = 2 [(gogoproto.nullable) = false];
-    optional RaftTruncatedState truncatedState  = 3 [(gogoproto.nullable) = false];
+    optional uint64             appliedIndex    = 1 [(gogoproto.nullable) = false];
+    optional RaftTruncatedState truncatedState  = 2 [(gogoproto.nullable) = false];
+    optional int64              committedOffset = 3 [(gogoproto.nullable) = false];
+    optional int64              committedIndex  = 4 [(gogoproto.nullable) = false];
 }
 
 // RaftTruncatedState raft snapshot state
@@ -64,6 +65,7 @@ message SnapshotMessageHeader {
     optional uint64        index           = 5 [(gogoproto.nullable) = false];
     optional uint64        seq             = 6 [(gogoproto.nullable) = false];
     optional int64         committedOffset = 7 [(gogoproto.nullable) = false];
+    optional int64         committedIndex  = 8 [(gogoproto.nullable) = false];
 }
 
 // SnapshotMessage message
@@ -140,6 +142,7 @@ message SplitRequest {
     repeated uint64 newPeerIDs      = 2;
     // The committedOffset last committed offset in mq
     optional int64  committedOffset = 3 [(gogoproto.nullable) = false];
+    optional int64  committedIndex  = 4 [(gogoproto.nullable) = false];
 }
 
 message SplitResponse {

@@ -9,7 +9,7 @@ import (
 )
 
 // PatchSaramaOffset add spec offset patch for sarama
-func PatchSaramaOffset(config *cluster.Config, committedOffset int64) error {
+func PatchSaramaOffset(config *cluster.Config, committedOffset, committedIndex int64) error {
 	if err := config.Validate(); err != nil {
 		return err
 	}
@@ -19,7 +19,11 @@ func PatchSaramaOffset(config *cluster.Config, committedOffset int64) error {
 
 	config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	if committedOffset >= 0 {
-		config.Consumer.Offsets.Initial = committedOffset + 1
+		if committedIndex == -1 {
+			config.Consumer.Offsets.Initial = committedOffset + 1
+		} else {
+			config.Consumer.Offsets.Initial = committedOffset
+		}
 		monkey.PatchInstanceMethod(reflect.TypeOf(config), "Validate", func(c *cluster.Config) error {
 			return nil
 		})

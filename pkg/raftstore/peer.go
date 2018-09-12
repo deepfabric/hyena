@@ -329,7 +329,8 @@ func (pr *PeerReplicate) onSearch(req *rpc.SearchRequest, cb func(interface{}), 
 func (pr *PeerReplicate) waitInsertCommitted(req *rpc.SearchRequest) {
 	if pr.isWritable() {
 		pr.condL.Lock()
-		for req.Offset > pr.ps.committedOffset() {
+		offset, index := pr.ps.committedOffset()
+		for req.Offset > offset || (req.Offset == offset && index == -1) {
 			pr.cond.Wait()
 		}
 		pr.condL.Unlock()

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/Shopify/sarama"
 	etcdraft "github.com/coreos/etcd/raft"
@@ -30,6 +29,8 @@ const (
 )
 
 type peerStorage struct {
+	sync.RWMutex
+
 	store *Store
 	db    meta.VectorDB
 	vdb   vectordb.DB
@@ -139,9 +140,10 @@ func (ps *peerStorage) initRaftApplyState() error {
 		ps.raftApplyState.AppliedIndex = raftInitLogIndex
 		ps.raftApplyState.TruncatedState.Index = raftInitLogIndex
 		ps.raftApplyState.TruncatedState.Term = raftInitLogTerm
-		ps.raftApplyState.CommittedOffset = mqInitCommittedOffset
 	}
 
+	ps.raftApplyState.CommittedOffset = mqInitCommittedOffset
+	ps.raftApplyState.CommittedIndex = 0
 	return nil
 }
 
@@ -248,7 +250,7 @@ func (ps *peerStorage) updatePeerState(db meta.VectorDB, state raftpb.PeerState,
 	return ps.store.metaStore.Set(getDBStateKey(db.ID), data, false)
 }
 
-func (ps *peerStorage) writeInitialState(id uint64, committedOffset int64, wb storage.WriteBatch) error {
+func (ps *peerStorage) writeInitialState(id uint64, committedOffset, committedIndex int64, wb storage.WriteBatch) error {
 	raftState := new(raftpb.RaftLocalState)
 	raftState.LastIndex = raftInitLogIndex
 	raftState.HardState.Term = raftInitLogTerm
@@ -259,6 +261,7 @@ func (ps *peerStorage) writeInitialState(id uint64, committedOffset int64, wb st
 	applyState.TruncatedState.Index = raftInitLogIndex
 	applyState.TruncatedState.Term = raftInitLogTerm
 	applyState.CommittedOffset = committedOffset
+	applyState.CommittedIndex = committedIndex
 
 	err := wb.Set(getRaftLocalStateKey(id), pbutil.MustMarshal(raftState))
 	if err != nil {
@@ -322,12 +325,19 @@ func (ps *peerStorage) committedIndex() uint64 {
 	return ps.raftlocalState.HardState.Commit
 }
 
-func (ps *peerStorage) committedOffset() int64 {
-	return atomic.LoadInt64(&ps.raftApplyState.CommittedOffset)
+func (ps *peerStorage) committedOffset() (int64, int64) {
+	ps.RLock()
+	offset := ps.raftApplyState.CommittedOffset
+	index := ps.raftApplyState.CommittedIndex
+	ps.RUnlock()
+	return offset, index
 }
 
-func (ps *peerStorage) setCommittedOffset(offset int64) {
-	atomic.StoreInt64(&ps.raftApplyState.CommittedOffset, offset)
+func (ps *peerStorage) setCommittedOffset(offset, index int64) {
+	ps.Lock()
+	ps.raftApplyState.CommittedOffset = offset
+	ps.raftApplyState.CommittedIndex = index
+	ps.Unlock()
 }
 
 func (ps *peerStorage) appliedIndex() uint64 {
@@ -344,6 +354,10 @@ func (ps *peerStorage) truncatedTerm() uint64 {
 
 func (ps *peerStorage) isApplyComplete() bool {
 	return ps.committedIndex() == ps.appliedIndex()
+}
+
+func (ps *peerStorage) availableWriteRecords() uint64 {
+	return ps.store.cfg.MaxDBRecords - ps.vectorRecords
 }
 
 // ====================== about jobs

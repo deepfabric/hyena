@@ -377,15 +377,26 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 		return
 	}
 
+	from, fromIndex := pr.ps.committedOffset()
 	vBatch := acquireVdbBatch()
+	vBatch.available = pr.ps.availableWriteRecords()
 
 	// 1. batch added to local vectordb
 	committedOffset := int64(0)
-	// TODO: make sure batch + already inserted == MaxRecords
+	index := int64(0)
+
 	for i := int64(0); i < n; i++ {
 		req := items[i].(*rpc.InsertRequest)
-		committedOffset = req.Offset
-		vBatch.append(req.Xbs, req.Ids)
+		if vBatch.appendable() {
+			if req.Offset > from {
+				committedOffset = req.Offset
+				index = vBatch.append(req.Xbs, req.Ids)
+			} else if req.Offset == from && fromIndex != -1 {
+				committedOffset = req.Offset
+				index = vBatch.appendFromIndex(req.Xbs, req.Ids, fromIndex)
+			}
+		}
+
 		util.ReleaseInsertReq(req)
 	}
 	pr.ps.vectorRecords += uint64(len(vBatch.ids))
@@ -397,15 +408,16 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 			err)
 	}
 
-	log.Debugf("raftstore[db-%d]: after added, %d records on committed offset %d",
+	log.Debugf("raftstore[db-%d]: after added, %d records on committed offset %d, index %d",
 		pr.id,
 		pr.ps.vectorRecords,
-		committedOffset)
+		committedOffset,
+		index)
 
 	releaseVdbBatch(vBatch)
 
 	// 2. update the committed offset and notify all waitting search request
-	pr.ps.setCommittedOffset(committedOffset)
+	pr.ps.setCommittedOffset(committedOffset, index)
 	err = pr.store.metaStore.Set(getRaftApplyStateKey(pr.id), pbutil.MustMarshal(&pr.ps.raftApplyState), false)
 	if err != nil {
 		log.Fatalf("raftstore[db-%d]: save apply context failed, errors:\n %+v",
@@ -482,7 +494,7 @@ func (pr *PeerReplicate) handleReady() {
 		}
 
 		// now we are join in the raft group, bootstrap the mq consumer to process insert requests
-		if pr.isWritable() {
+		if pr.isWritable() && etcdraft.IsEmptySnap(rd.Snapshot) {
 			pr.maybeStartConsumer()
 		}
 	}
@@ -860,6 +872,7 @@ func (ps *peerStorage) doAppendSnap(ctx *readyContext, snap etcdraftpb.Snapshot)
 	ctx.raftState.LastIndex = lastIndex
 	ctx.applyState.AppliedIndex = lastIndex
 	ctx.applyState.CommittedOffset = ctx.snap.Header.CommittedOffset
+	ctx.applyState.CommittedIndex = ctx.snap.Header.CommittedIndex
 	ctx.lastTerm = lastTerm
 
 	// The snapshot only contains log which index > applied index, so
@@ -1092,15 +1105,17 @@ func (pr *PeerReplicate) maybeSplit() {
 		pr.maybeStopConsumer()
 
 		if pr.isLeader() && !pr.ps.inAsking && pr.isWritable() {
-			log.Infof("raftstore[db-%d]: %d reach the maximum limit %d per db, split at committedOffset %d. %+v",
+			offset, index := pr.ps.committedOffset()
+			log.Infof("raftstore[db-%d]: %d reach the maximum limit %d per db, split at committed offset %d, index %d, %+v",
 				pr.id,
 				pr.ps.vectorRecords,
 				pr.store.cfg.MaxDBRecords,
-				pr.ps.db,
-				pr.ps.committedOffset())
+				offset,
+				index,
+				pr.ps.db)
 			pr.ps.inAsking = true
 
-			err := pr.startAskSplitJob(pr.ps.db, pr.ps.committedOffset())
+			err := pr.startAskSplitJob(pr.ps.db, offset, index)
 			if err != nil {
 				log.Fatalf("raftstore[db-%d]: add ask split job failed, errors: %+v",
 					pr.id,

@@ -139,7 +139,7 @@ func (d *applyDelegate) doExecSplit(ctx *applyContext) (*execResult, error) {
 		err = d.ps.updatePeerState(newDB, raftpb.Normal, wb)
 	}
 	if err == nil {
-		err = d.ps.writeInitialState(newDB.ID, req.CommittedOffset, wb)
+		err = d.ps.writeInitialState(newDB.ID, req.CommittedOffset, req.CommittedIndex, wb)
 	}
 	if err != nil {
 		log.Fatalf("raftstore[db-%d]: save split db failed, newDB=<%+v> errors:\n %+v",

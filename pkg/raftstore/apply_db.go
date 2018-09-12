@@ -14,9 +14,10 @@ const (
 )
 
 type vdbBatch struct {
-	xbs []float32
-	ids []int64
-	doF func(d *applyDelegate) error
+	available uint64
+	xbs       []float32
+	ids       []int64
+	doF       func(d *applyDelegate) error
 }
 
 func (b *vdbBatch) do(d *applyDelegate) error {
@@ -35,12 +36,45 @@ func (b *vdbBatch) doUpdate(d *applyDelegate) error {
 	return d.ps.vdb.UpdateWithIds(b.xbs, b.ids)
 }
 
-func (b *vdbBatch) append(xbs []float32, ids []int64) {
-	b.xbs = append(b.xbs, xbs...)
-	b.ids = append(b.ids, ids...)
+func (b *vdbBatch) append(xbs []float32, ids []int64) int64 {
+	n := uint64(len(ids))
+	if b.available >= n {
+		b.available -= n
+		b.xbs = append(b.xbs, xbs...)
+		b.ids = append(b.ids, ids...)
+		return -1
+	}
+
+	d := uint64(len(xbs) / len(ids))
+	b.ids = append(b.ids, ids[:b.available]...)
+	b.xbs = append(b.xbs, xbs[:b.available*d]...)
+	next := int64(b.available)
+	b.available = 0
+	return next - 1
+}
+
+func (b *vdbBatch) appendFromIndex(xbs []float32, ids []int64, index int64) int64 {
+	n := int64(len(ids))
+	d := int64(len(xbs) / len(ids))
+
+	if n <= index+1 {
+		log.Fatalf("bug: invalid mq consumer index: %d, only %d", index, n)
+	}
+
+	retIndex := b.append(xbs[(index+1)*d:], ids[index+1:])
+	if retIndex == -1 {
+		return -1
+	}
+
+	return index + retIndex + 1
+}
+
+func (b *vdbBatch) appendable() bool {
+	return b.available > 0
 }
 
 func (b *vdbBatch) reset() {
+	b.available = 0
 	b.doF = nil
 	b.xbs = b.xbs[:0]
 	b.ids = b.ids[:0]

@@ -132,6 +132,7 @@ func (s *Store) startDBs() {
 	tomebstoneCount := 0
 	applyingCount := 0
 
+	var states []*raftpb.DBLocalState
 	wb := s.metaStore.NewWriteBatch()
 	err := s.metaStore.Scan(dbMetaMinKey, dbMetaMaxKey, func(key, value []byte) (bool, error) {
 		id, suffix, err := decodeMetaKey(key)
@@ -158,20 +159,7 @@ func (s *Store) startDBs() {
 			return true, nil
 		}
 
-		pr, err := createPeerReplicate(s, &localState.DB)
-		if err != nil {
-			return false, err
-		}
-
-		if localState.State == raftpb.Applying {
-			applyingCount++
-			log.Infof("raftstore[db-%d]: applying in store", id)
-			pr.startApplySnapJob()
-		}
-
-		pr.startRegistrationJob()
-		s.replicates.Store(id, pr)
-
+		states = append(states, localState)
 		return true, nil
 	})
 
@@ -181,6 +169,24 @@ func (s *Store) startDBs() {
 	err = s.metaStore.Write(wb, false)
 	if err != nil {
 		log.Fatalf("raftstore: init store write failed, errors:\n %+v", err)
+	}
+
+	for i := len(states) - 1; i >= 0; i-- {
+		state := states[i]
+		db := &state.DB
+		pr, err := createPeerReplicate(s, db)
+		if err != nil {
+			log.Fatalf("raftstore: init store failed, errors:\n %+v", err)
+		}
+
+		if state.State == raftpb.Applying {
+			applyingCount++
+			log.Infof("raftstore[db-%d]: applying in store", db.ID)
+			pr.startApplySnapJob()
+		}
+
+		pr.startRegistrationJob()
+		s.replicates.Store(db.ID, pr)
 	}
 
 	log.Infof("raftstore: starts with %d dbs, including %d tombstones and %d applying dbs",
