@@ -31,9 +31,10 @@ const (
 type peerStorage struct {
 	sync.RWMutex
 
-	store *Store
-	db    meta.VectorDB
-	vdb   vectordb.DB
+	store     *Store
+	db        meta.VectorDB
+	vdb       vectordb.DB
+	destroied bool
 
 	lastTerm         uint64
 	appliedIndexTerm uint64
@@ -91,6 +92,22 @@ func newPeerStorage(store *Store, db meta.VectorDB) (*peerStorage, error) {
 
 	ps.lastReadyIndex = ps.appliedIndex()
 	return ps, nil
+}
+
+func (ps *peerStorage) destroy() {
+	ps.Lock()
+	if !ps.destroied {
+		err := ps.vdb.Destroy()
+		if err != nil {
+			if err != nil {
+				log.Fatalf("raftstore-[db-%d]: destroy vectordb instance failed, errors:%+v",
+					ps.db.ID,
+					err)
+			}
+		}
+		ps.destroied = true
+	}
+	ps.Unlock()
 }
 
 func (ps *peerStorage) initRaftLocalState() error {

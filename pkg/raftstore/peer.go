@@ -220,13 +220,7 @@ func (pr *PeerReplicate) destroy() error {
 		pr.store.runner.StopCancelableTask(id)
 	}
 
-	err = pr.ps.vdb.Destroy()
-	if err != nil {
-		log.Fatalf("raftstore-[db-%d]: destroy vectordb instance failed, errors:%+v",
-			pr.id,
-			err)
-	}
-
+	pr.ps.destroy()
 	log.Infof("raftstore-[db-%d]: destroy self complete.",
 		pr.id)
 	return nil

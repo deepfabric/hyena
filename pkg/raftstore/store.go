@@ -208,6 +208,10 @@ func (s *Store) startDBs() {
 
 	wg.Wait()
 
+	if len(states) == 0 {
+		atomic.StoreUint64(&s.firstDBLoaded, 1)
+	}
+
 	log.Infof("raftstore: starts with %d dbs, including %d tombstones and %d applying dbs",
 		totalCount,
 		tomebstoneCount,
@@ -611,6 +615,8 @@ func (s *Store) destroyPeer(id uint64, target meta.Peer, async bool) {
 				id,
 				err)
 		}
+
+		s.replicates.Delete(pr.id)
 	} else {
 		log.Infof("raftstore[db-%d]: asking destroying stale peer, peer=<%v>",
 			id,
