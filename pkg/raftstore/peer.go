@@ -159,7 +159,7 @@ func (pr *PeerReplicate) maybeCampaign() (bool, error) {
 		return false, err
 	}
 
-	log.Debugf("raftstore[%d]: try to campaign leader",
+	log.Debugf("raftstore[db-%d]: try to campaign leader",
 		pr.id)
 	return true, nil
 }
@@ -172,7 +172,7 @@ func (pr *PeerReplicate) tryCampaign() error {
 			return err
 		}
 
-		log.Debugf("raftstore[%d]: try to campaign leader",
+		log.Debugf("raftstore[db-%d]: try to campaign leader",
 			pr.id)
 	}
 
@@ -218,6 +218,13 @@ func (pr *PeerReplicate) destroy() error {
 
 	for _, id := range pr.cancelTaskIds {
 		pr.store.runner.StopCancelableTask(id)
+	}
+
+	err = pr.ps.vdb.Destroy()
+	if err != nil {
+		log.Fatalf("raftstore-[db-%d]: destroy vectordb instance failed, errors:%+v",
+			pr.id,
+			err)
 	}
 
 	log.Infof("raftstore-[db-%d]: destroy self complete.",

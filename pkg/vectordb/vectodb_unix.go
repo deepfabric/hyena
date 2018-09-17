@@ -62,6 +62,13 @@ func (d *db) UpdateIndex() error {
 	return d.vdb.UpdateIndex()
 }
 
+func (d *db) Destroy() error {
+	d.Lock()
+	err := d.vdb.Destroy()
+	d.Unlock()
+	return err
+}
+
 func (d *db) Clean() error {
 	d.Lock()
 	err := os.RemoveAll(d.path)

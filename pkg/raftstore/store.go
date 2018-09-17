@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	etcdraftpb "github.com/coreos/etcd/raft/raftpb"
@@ -46,6 +47,8 @@ type Store struct {
 	// metrics
 	startAt            uint32
 	reveivingSnapCount uint64
+
+	firstDBLoaded uint64
 }
 
 // NewStore returns store
@@ -171,23 +174,39 @@ func (s *Store) startDBs() {
 		log.Fatalf("raftstore: init store write failed, errors:\n %+v", err)
 	}
 
+	var wg sync.WaitGroup
 	for i := len(states) - 1; i >= 0; i-- {
 		state := states[i]
-		db := &state.DB
-		pr, err := createPeerReplicate(s, db)
-		if err != nil {
-			log.Fatalf("raftstore: init store failed, errors:\n %+v", err)
+		wg.Add(1)
+
+		f := func(state *raftpb.DBLocalState) {
+			defer wg.Done()
+
+			db := &state.DB
+			pr, err := createPeerReplicate(s, db)
+			if err != nil {
+				log.Fatalf("raftstore: init store failed, errors:\n %+v", err)
+			}
+
+			if state.State == raftpb.Applying {
+				applyingCount++
+				log.Infof("raftstore[db-%d]: applying in store", db.ID)
+				pr.startApplySnapJob()
+			}
+
+			pr.startRegistrationJob()
+			s.replicates.Store(db.ID, pr)
 		}
 
-		if state.State == raftpb.Applying {
-			applyingCount++
-			log.Infof("raftstore[db-%d]: applying in store", db.ID)
-			pr.startApplySnapJob()
+		if i == len(states)-1 {
+			f(state)
+			atomic.StoreUint64(&s.firstDBLoaded, 1)
+		} else {
+			go f(state)
 		}
-
-		pr.startRegistrationJob()
-		s.replicates.Store(db.ID, pr)
 	}
+
+	wg.Wait()
 
 	log.Infof("raftstore: starts with %d dbs, including %d tombstones and %d applying dbs",
 		totalCount,
@@ -388,6 +407,13 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 			id,
 			target,
 			message.Type)
+		return false
+	}
+
+	// if the newest db in the store is not loaded, ignore
+	if atomic.LoadUint64(&s.firstDBLoaded) == 0 {
+		log.Infof("raftstore[db-%d]: ignore create peer, wait first db loaded to decide",
+			id)
 		return false
 	}
 

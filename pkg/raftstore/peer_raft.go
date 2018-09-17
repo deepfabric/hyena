@@ -361,6 +361,11 @@ func (pr *PeerReplicate) handleRequest(items []interface{}) {
 }
 
 func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
+	if pr.ps.availableWriteRecords() == 0 {
+		pr.maybeStopConsumer()
+		return
+	}
+
 	size := pr.mqRequests.Len()
 	if size == 0 {
 		return
@@ -476,7 +481,7 @@ func (pr *PeerReplicate) handleReady() {
 		}
 
 		if !pr.store.snapMgr.Exists(ctx.snap) {
-			log.Infof("raftstore[db-%d]: receiving snapshot, skip further handling",
+			log.Debugf("raftstore[db-%d]: receiving snapshot, skip further handling",
 				pr.id)
 			releaseReadyContext(ctx)
 			return
@@ -1171,12 +1176,14 @@ func (s *Store) doApplyConfChange(id uint64, cp *changePeer) {
 		// We only care remove itself now.
 		if cp.peer.StoreID == pr.store.meta.ID {
 			if cp.peer.ID == pr.peer.ID {
-				s.destroyPeer(id, cp.peer, false)
-			} else {
-				log.Fatalf("raftstore[cell-%d]: trying to remove unknown peer, peer=<%+v>",
-					id,
-					cp.peer)
+				// sync remove self peer, and stop the raft event loop
+				s.destroyPeer(id, cp.peer, true)
+				return
 			}
+
+			log.Fatalf("raftstore[db-%d]: trying to remove unknown peer, peer=<%+v>",
+				id,
+				cp.peer)
 		}
 	}
 

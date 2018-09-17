@@ -21,7 +21,7 @@ func (pr *PeerReplicate) maybeStartConsumer() {
 			offset, index := pr.ps.committedOffset()
 			err := util.PatchSaramaOffset(config, offset, index)
 			if err != nil {
-				log.Fatalf("raftstore[%d]: start mq consumer failed: %+v",
+				log.Fatalf("raftstore[db-%d]: start mq consumer failed: %+v",
 					pr.id,
 					err)
 			}
@@ -35,8 +35,8 @@ func (pr *PeerReplicate) maybeStartConsumer() {
 			pr.consumer = c
 			pr.condL = &sync.Mutex{}
 			pr.cond = sync.NewCond(pr.condL)
-			pr.doStartConsumerLoops()
-			log.Infof("raftstore[%d]: ********start mq consumer with offset %d********",
+			pr.doStartConsumerLoops(config.Consumer.Offsets.Initial)
+			log.Infof("raftstore[db-%d]: ********start mq consumer with offset %d********",
 				pr.id,
 				config.Consumer.Offsets.Initial)
 		}()
@@ -48,28 +48,28 @@ func (pr *PeerReplicate) maybeStopConsumer() {
 		pr.consumerCloseOnce.Do(func() {
 			err := pr.consumer.Close()
 			if err != nil {
-				log.Fatalf("raftstore[%d]: stop mq consumer failed: %+v",
+				log.Fatalf("raftstore[db-%d]: stop mq consumer failed: %+v",
 					pr.id,
 					err)
 			}
 			pr.mqRequests.Dispose()
-			log.Infof("raftstore[%d]: ********stop mq consumer********",
+			log.Infof("raftstore[db-%d]: ********stop mq consumer********",
 				pr.id)
 		})
 	}
 }
 
-func (pr *PeerReplicate) doStartConsumerLoops() {
+func (pr *PeerReplicate) doStartConsumerLoops(offset int64) {
 	go func() {
 		for {
 			err, ok := <-pr.consumer.Errors()
 			if !ok {
-				log.Errorf("raftstore[%d]: mq consumer error loop exit",
+				log.Errorf("raftstore[db-%d]: mq consumer error loop exit",
 					pr.id)
 				return
 			}
 
-			log.Errorf("raftstore[%d]: mq consumer fialed: %+v",
+			log.Errorf("raftstore[db-%d]: mq consumer fialed: %+v",
 				pr.id,
 				err)
 		}
@@ -79,12 +79,12 @@ func (pr *PeerReplicate) doStartConsumerLoops() {
 		for {
 			nty, ok := <-pr.consumer.Notifications()
 			if !ok {
-				log.Errorf("raftstore[%d]: mq consumer notify loop exit",
+				log.Errorf("raftstore[db-%d]: mq consumer notify loop exit",
 					pr.id)
 				return
 			}
 
-			log.Infof("raftstore[%d]: mq consumer notify: %+v",
+			log.Infof("raftstore[db-%d]: mq consumer notify: %+v",
 				pr.id,
 				nty)
 		}
@@ -99,19 +99,21 @@ func (pr *PeerReplicate) doStartConsumerLoops() {
 				return
 			}
 
-			buf := acquireBuf(len(message.Value))
-			buf.Write(message.Value)
-			_, msg, err := bizCodc.GetDecoder().Decode(buf)
-			if err != nil {
-				log.Fatalf("bug: decode from nsq failed, errors:\n%+v",
-					err)
-			}
+			if offset <= message.Offset {
+				buf := acquireBuf(len(message.Value))
+				buf.Write(message.Value)
+				_, msg, err := bizCodc.GetDecoder().Decode(buf)
+				if err != nil {
+					log.Fatalf("bug: decode from nsq failed, errors:\n%+v",
+						err)
+				}
 
-			if req, ok := msg.(*rpc.InsertRequest); ok {
-				req.Offset = message.Offset
-				pr.addRequestFromMQ(req)
-			} else if req, ok := msg.(*rpc.UpdateRequest); ok {
-				pr.mqUpdateRequests.Put(req)
+				if req, ok := msg.(*rpc.InsertRequest); ok {
+					req.Offset = message.Offset
+					pr.addRequestFromMQ(req)
+				} else if req, ok := msg.(*rpc.UpdateRequest); ok {
+					pr.mqUpdateRequests.Put(req)
+				}
 			}
 
 			pr.consumer.MarkOffset(message, "")

@@ -6,6 +6,7 @@ type DB interface {
 	AddWithIds(newXb []float32, newXids []int64) error
 	Search(xq, distances []float32, xids []int64) (int, error)
 	UpdateIndex() error
+	Destroy() error
 
 	Clean() error
 	Records() (uint64, error)

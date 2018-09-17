@@ -455,7 +455,7 @@ func (ps *peerStorage) Entries(low, high, maxSize uint64) ([]etcdraftpb.Entry, e
 	startKey := getRaftLogKey(ps.db.ID, low)
 
 	if low+1 == high {
-		// If election happens in inactive cells, they will just try
+		// If election happens in inactive dbs, they will just try
 		// to fetch one empty log.
 		v, err := ps.store.metaStore.Get(startKey)
 		if err != nil {
