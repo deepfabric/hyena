@@ -249,7 +249,7 @@ func (pr *PeerReplicate) doApplySnapJob() error {
 	log.Infof("raftstore[db-%d]: apply snap complete", pr.id)
 
 	if pr.isWritable() {
-		pr.maybeStartConsumer()
+		pr.maybeStartConsumer("apply snap")
 	}
 
 	return nil

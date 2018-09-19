@@ -99,7 +99,7 @@ func (pa *ProphetAdapter) HBHandler() prophet.HeartbeatHandler {
 func (pa *ProphetAdapter) ChangeLeader(resourceID uint64, newLeader *prophet.Peer) {
 	pr := pa.store.getDB(resourceID, true)
 	if nil == pr {
-		log.Fatal("bug: db can'not be nil")
+		return
 	}
 
 	log.Debugf("raftstore[db-%d]: try to transfer leader, from=<%v> to=<%+v>",
@@ -122,7 +122,7 @@ func (pa *ProphetAdapter) ChangeLeader(resourceID uint64, newLeader *prophet.Pee
 func (pa *ProphetAdapter) ChangePeer(resourceID uint64, peer *prophet.Peer, changeType prophet.ChangePeerType) {
 	pr := pa.store.getDB(resourceID, true)
 	if nil == pr {
-		log.Fatal("bug: db can'not be nil")
+		return
 	}
 
 	var ct etcdraftpb.ConfChangeType

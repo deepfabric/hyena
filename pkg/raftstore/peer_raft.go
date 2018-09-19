@@ -151,18 +151,17 @@ func (pr *PeerReplicate) readyToServeRaft(ctx context.Context) {
 			return
 		}
 
-		pr.handleStep(items)
+		pr.handleAction(items)
 		pr.handleTick(items)
 		pr.handleReport(items)
-		pr.handleApplyResult(items)
 		pr.handleRequest(items)
 		pr.handleRequestFromMQ(items)
 
+		pr.handleApplyResult(items)
+		pr.handleStep(items)
 		if pr.rn.HasReadySince(pr.ps.lastReadyIndex) {
 			pr.handleReady()
 		}
-
-		pr.handleAction(items)
 	}
 }
 
@@ -499,8 +498,11 @@ func (pr *PeerReplicate) handleReady() {
 		}
 
 		// now we are join in the raft group, bootstrap the mq consumer to process insert requests
-		if pr.isWritable() && etcdraft.IsEmptySnap(rd.Snapshot) {
-			pr.maybeStartConsumer()
+		if pr.isWritable() &&
+			etcdraft.IsEmptySnap(rd.Snapshot) &&
+			// create by raft message, need start mq after apply snapshot
+			pr.ps.raftApplyState.AppliedIndex > 0 {
+			pr.maybeStartConsumer("join raft-group")
 		}
 	}
 
@@ -1177,7 +1179,7 @@ func (s *Store) doApplyConfChange(id uint64, cp *changePeer) {
 		if cp.peer.StoreID == pr.store.meta.ID {
 			if cp.peer.ID == pr.peer.ID {
 				// sync remove self peer, and stop the raft event loop
-				s.destroyPeer(id, cp.peer, true)
+				s.destroyPeer(id, cp.peer, false)
 				return
 			}
 

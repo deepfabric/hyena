@@ -602,7 +602,8 @@ func (s *Store) destroyPeer(id uint64, target meta.Peer, async bool) {
 
 		pr := s.getDB(id, false)
 		if pr == nil {
-			log.Fatalf("raftstore[db-%d]: destroy db not exist", id)
+			log.Warnf("raftstore[db-%d]: destroy db not exist, maybe is already destroied", id)
+			return
 		}
 
 		if pr.ps.isApplyingSnap() {

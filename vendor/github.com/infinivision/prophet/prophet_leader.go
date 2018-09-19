@@ -74,8 +74,6 @@ func (p *Prophet) startLeaderLoop() {
 }
 
 func (p *Prophet) enableLeader() {
-	// now, we are leader
-	atomic.StoreInt64(&p.leaderFlag, 1)
 	log.Infof("prophet: ********become to leader now********")
 	p.leader = p.node
 
@@ -87,6 +85,9 @@ func (p *Prophet) enableLeader() {
 
 	p.wn = newWatcherNotifier(p.rt)
 	go p.wn.start()
+
+	// now, we are leader
+	atomic.StoreInt64(&p.leaderFlag, 1)
 
 	p.notifyElectionComplete()
 	p.cfg.Handler.BecomeLeader()

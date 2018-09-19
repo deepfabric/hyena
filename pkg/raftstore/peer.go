@@ -181,6 +181,18 @@ func (pr *PeerReplicate) tryCampaign() error {
 
 func (pr *PeerReplicate) stopEventLoop() {
 	pr.events.Dispose()
+	pr.closeAllQueues()
+}
+
+func (pr *PeerReplicate) closeAllQueues() {
+	pr.ticks.Dispose()
+	pr.steps.Dispose()
+	pr.reports.Dispose()
+	pr.applyResults.Dispose()
+	pr.requests.Dispose()
+	pr.mqRequests.Dispose()
+	pr.mqUpdateRequests.Dispose()
+	pr.actions.Dispose()
 }
 
 func (pr *PeerReplicate) destroy() error {

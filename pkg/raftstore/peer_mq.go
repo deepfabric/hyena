@@ -11,7 +11,7 @@ import (
 	"github.com/infinivision/hyena/pkg/util"
 )
 
-func (pr *PeerReplicate) maybeStartConsumer() {
+func (pr *PeerReplicate) maybeStartConsumer(from string) {
 	pr.consumerStartOnce.Do(func() {
 		go func() {
 			config := cluster.NewConfig()
@@ -36,8 +36,9 @@ func (pr *PeerReplicate) maybeStartConsumer() {
 			pr.condL = &sync.Mutex{}
 			pr.cond = sync.NewCond(pr.condL)
 			pr.doStartConsumerLoops(config.Consumer.Offsets.Initial)
-			log.Infof("raftstore[db-%d]: ********start mq consumer with offset %d********",
+			log.Infof("raftstore[db-%d]: ********start mq consumer by %s with offset %d********",
 				pr.id,
+				from,
 				config.Consumer.Offsets.Initial)
 		}()
 	})
