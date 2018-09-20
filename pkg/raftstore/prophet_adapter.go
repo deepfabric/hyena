@@ -56,7 +56,7 @@ func (pa *ProphetAdapter) FetchAllResourceHB() []*prophet.ResourceHeartbeatReq {
 
 // FetchContainerHB fetch container HB
 func (pa *ProphetAdapter) FetchContainerHB() *prophet.ContainerHeartbeatReq {
-	stats, err := util.DiskStats(pa.store.cfg.DataPath)
+	stats, err := util.MemStats()
 	if err != nil {
 		log.Errorf("raftstore[db-%d]: fetch store heartbeat failed, errors:\n %+v",
 			pa.store.meta.ID,

@@ -42,7 +42,7 @@
   version = "v2.1.13"
 
 [[projects]]
-  digest = "0:"
+  digest = "1:6bda4e232607261eeaee45b0a0e8a2ef097bd44e8a44d9b7ca1badb36e523891"
   name = "github.com/coreos/bbolt"
   packages = ["."]
   pruneopts = "UT"
@@ -414,11 +414,12 @@
   revision = "e2704e165165ec55d062f5919b4b29494e9fa790"
 
 [[projects]]
-  digest = "1:de61d9147d0d96bcf8bad16b8f5b0fbc3bce8d974ca93b97aba27275c66110a9"
+  digest = "1:bebefffdb8bcb4969612f019704fcedfb957617c8ac7ae79b3b58372ca003954"
   name = "github.com/shirou/gopsutil"
   packages = [
     "disk",
     "internal/common",
+    "mem",
   ]
   pruneopts = "UT"
   revision = "eeb1d38d69593f121e060d24d17f7b1f0936b203"
@@ -605,6 +606,7 @@
     "github.com/golang/protobuf/proto",
     "github.com/infinivision/prophet",
     "github.com/shirou/gopsutil/disk",
+    "github.com/shirou/gopsutil/mem",
     "golang.org/x/net/context",
     "golang.org/x/time/rate",
   ]

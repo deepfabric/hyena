@@ -34,3 +34,7 @@ ignored = ["github.com/deepfabric/c-nemo", "github.com/deepfabric/go-nemo", "git
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/shirou/gopsutil"
+  version = "2.18.5"
