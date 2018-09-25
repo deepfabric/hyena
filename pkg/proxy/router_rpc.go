@@ -1,10 +1,11 @@
 package proxy
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fagongzi/util/hack"
 
 	"github.com/fagongzi/goetty"
 	"github.com/fagongzi/log"
@@ -28,9 +29,9 @@ func (ctx *asyncContext) addTimeout(id interface{}, timeout *goetty.Timeout) {
 }
 
 func (ctx *asyncContext) done(rsp *rpc.SearchResponse) {
-	if value, ok := ctx.timeouts.Load(rsp.ID); ok {
+	ctx.timeouts.Delete(hack.SliceToString(rsp.ID))
+	if value, ok := ctx.timeouts.Load(hack.SliceToString(rsp.ID)); ok {
 		value.(*goetty.Timeout).Stop()
-		ctx.timeouts.Delete(rsp.ID)
 		ctx.Lock()
 		for idx, value := range rsp.Xids {
 			if value != -1 && betterThan(rsp.Distances[idx], ctx.distances[idx]) {
@@ -48,7 +49,9 @@ func (ctx *asyncContext) done(rsp *rpc.SearchResponse) {
 }
 
 func (ctx *asyncContext) onTimeout(arg interface{}) {
-	ctx.timeoutC <- struct{}{}
+	if _, ok := ctx.timeouts.Load(arg); ok {
+		ctx.timeoutC <- struct{}{}
+	}
 }
 
 func (ctx *asyncContext) get(timeout time.Duration) ([]float32, []int64, error) {
@@ -58,8 +61,7 @@ func (ctx *asyncContext) get(timeout time.Duration) ([]float32, []int64, error) 
 	case <-ctx.completeC:
 		return ctx.distances, ctx.ids, nil
 	case <-ctx.timeoutC:
-		log.Warnf("search timeout")
-		return ctx.distances, ctx.ids, fmt.Errorf("timeout")
+		return ctx.distances, ctx.ids, nil
 	}
 }
 
@@ -93,12 +95,12 @@ func (r *router) onTimeout(arg interface{}) {
 }
 
 func (r *router) addAsyncCtx(ctx *asyncContext, req *rpc.SearchRequest) {
-	r.ctxs.Store(req.ID, ctx)
-	timeout, err := util.DefaultTimeoutWheel().Schedule(r.timeout, r.onTimeout, req.ID)
+	r.ctxs.Store(key(req.ID), ctx)
+	timeout, err := util.DefaultTimeoutWheel().Schedule(r.timeout, r.onTimeout, key(req.ID))
 	if err != nil {
 		log.Fatal("bug: timeout can not added failed")
 	}
-	ctx.addTimeout(req.ID, &timeout)
+	ctx.addTimeout(key(req.ID), &timeout)
 }
 
 func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
@@ -108,6 +110,7 @@ func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
 	l := len(req.Xq)
 	ctx.to = uint64(len(r.dbs))
 	ctx.timeoutC = make(chan struct{}, ctx.to)
+	ctx.completeC = make(chan struct{}, 1)
 	ctx.distances = make([]float32, l, l)
 	ctx.ids = make([]int64, l, l)
 	for id, db := range r.dbs {
@@ -128,9 +131,9 @@ func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
 
 func (r *router) onResponse(msg interface{}) {
 	if rsp, ok := msg.(*rpc.SearchResponse); ok {
-		value, ok := r.ctxs.Load(rsp.ID)
+		value, ok := r.ctxs.Load(key(rsp.ID))
 		if ok {
-			r.ctxs.Delete(rsp.ID)
+			r.ctxs.Delete(key(rsp.ID))
 			value.(*asyncContext).done(rsp)
 		}
 	}
@@ -139,4 +142,8 @@ func (r *router) onResponse(msg interface{}) {
 func (r *router) selectTargetPeer(db *meta.VectorDB) *meta.Peer {
 	op := r.opts[db.ID]
 	return db.Peers[int(atomic.AddUint64(&op, 1))%len(db.Peers)]
+}
+
+func key(id []byte) string {
+	return hack.SliceToString(id)
 }

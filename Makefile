@@ -11,11 +11,16 @@ CGO_ENABLED = 1
 DIST_DIR 	= $(ROOT_DIR)dist/
 
 .PHONY: release
-release: dist_dir hyena;
+release: dist_dir hyena bench;
 
 .PHONY: hyena
 hyena: ; $(info ======== compiled hyena:)
 	env CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) go build  -o $(DIST_DIR)hyena $(LD_FLAGS) $(ROOT_DIR)cmd/hyena/*.go
+
+.PHONY: bench
+bench: ; $(info ======== compiled bench:)
+	env CGO_ENABLED=$(CGO_ENABLED) GOOS=$(GOOS) go build  -o $(DIST_DIR)bench $(LD_FLAGS) $(ROOT_DIR)cmd/bench/*.go
+
 
 .PHONY: dist_dir
 dist_dir: ; $(info ======== prepare distribute dir:)

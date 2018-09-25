@@ -93,8 +93,9 @@ OUTER:
 				continue OUTER
 			}
 
-			log.Infof("transport: %d request sent to store %s failed, retry",
+			log.Infof("transport: %d request sent to store %s failed, %+v, retry",
 				len(items),
+				err,
 				t.addr)
 			t.resetConn()
 		}

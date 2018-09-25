@@ -46,6 +46,7 @@ func NewServer(addr, raftAddr string, opts ...Option) *Server {
 	}
 
 	svr := &Server{
+		opts:     sopts,
 		addr:     addr,
 		raftAddr: raftAddr,
 		runner:   task.NewRunner(),

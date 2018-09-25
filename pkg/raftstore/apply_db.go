@@ -115,7 +115,7 @@ func (d *applyDelegate) execUpdate(ctx *applyContext, req *rpc.UpdateRequest) {
 }
 
 func (pr *PeerReplicate) execSearch(req *rpc.SearchRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
-	n := len(req.Xq)
+	n := len(req.Xq) / pr.store.cfg.Dim
 	ds := make([]float32, n, n)
 	ids := make([]int64, n, n)
 

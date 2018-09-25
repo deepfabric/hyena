@@ -11,9 +11,10 @@ type options struct {
 	timeout time.Duration
 }
 
-func defaultOptions() *options {
-	return &options{
-		timeout: time.Millisecond * 200,
+// WithSearchTimeout with timeout option
+func WithSearchTimeout(timeout time.Duration) Option {
+	return func(opts *options) {
+		opts.timeout = timeout
 	}
 }
 

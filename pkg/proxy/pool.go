@@ -9,9 +9,7 @@ import (
 var (
 	ctxPool = sync.Pool{
 		New: func() interface{} {
-			return &asyncContext{
-				completeC: make(chan struct{}, 1),
-			}
+			return &asyncContext{}
 		},
 	}
 

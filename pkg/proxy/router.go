@@ -22,6 +22,7 @@ type router struct {
 	transports  map[uint64]*transport
 	ctxs        *sync.Map
 	timeout     time.Duration
+	initC       chan struct{}
 }
 
 func newRouter(timeout time.Duration, addrs ...string) *router {
@@ -34,6 +35,7 @@ func newRouter(timeout time.Duration, addrs ...string) *router {
 		transports:  make(map[uint64]*transport),
 		ctxs:        &sync.Map{},
 		timeout:     timeout,
+		initC:       make(chan struct{}, 1),
 	}
 }
 
@@ -48,6 +50,8 @@ func (r *router) start() {
 		switch evt.Event {
 		case prophet.EventInit:
 			r.updateAll(evt)
+			log.Debugf("after init******************")
+			r.initC <- struct{}{}
 		case prophet.EventResourceCreated:
 			db := parseDB(evt.Value)
 			log.Debugf("event: db %d created", db.ID)
@@ -90,7 +94,7 @@ func (r *router) addStore(store *meta.Store, lock bool) {
 		log.Fatal("bugs: add a exist store of event notify")
 	}
 	r.stores[store.ID] = store
-	r.transports[store.ID] = newTransport(store.Address, r.timeout, r)
+	r.transports[store.ID] = newTransport(store.ClientAddress, r.timeout, r)
 	go r.transports[store.ID].start()
 
 	if lock {
