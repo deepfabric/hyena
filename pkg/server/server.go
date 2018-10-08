@@ -110,17 +110,16 @@ func (s *Server) doConnection(conn goetty.IOSession) error {
 
 	session := newSession(conn)
 	s.sessions.Store(session.id, session)
-	go session.writeLoop()
-
-	defer func() {
-		s.sessions.Delete(session.id)
-		session.close()
-	}()
+	stopC := make(chan struct{}, 1)
+	go session.writeLoop(stopC)
 
 	// The session usually is a proxy, the proxy can send insert,update,search.
 	for {
 		req, err := conn.ReadTimeout(s.opts.timeoutRead)
 		if err != nil {
+			s.sessions.Delete(session.id)
+			session.close()
+			<-stopC
 			return err
 		}
 

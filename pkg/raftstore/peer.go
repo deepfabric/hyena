@@ -287,8 +287,7 @@ func (pr *PeerReplicate) collectPendingPeers() []*prophet.Peer {
 		}
 
 		if progress.Match < truncatedIdx {
-			if value, ok := pr.store.peers.Load(id); ok {
-				p := value.(meta.Peer)
+			if p := pr.store.getPeer(id); p != nil {
 				pendingPeers = append(pendingPeers, &prophet.Peer{ID: p.ID, ContainerID: p.StoreID})
 			}
 		}

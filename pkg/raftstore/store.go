@@ -649,7 +649,7 @@ func (s *Store) removeDroppedVoteMsg(id uint64) (etcdraftpb.Message, bool) {
 }
 
 func (s *Store) addPeerToCache(peer meta.Peer) {
-	s.peers.Store(peer.ID, peer)
+	s.peers.Store(peer.ID, &peer)
 }
 
 func (s *Store) getWriteableDB(leader bool) *PeerReplicate {

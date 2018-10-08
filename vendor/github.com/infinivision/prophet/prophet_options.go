@@ -26,6 +26,7 @@ type Option func(*options)
 func WithExternalEtcd(client *clientv3.Client) Option {
 	return func(opts *options) {
 		opts.client = client
+		opts.cfg.StorageNode = false
 	}
 }
 
@@ -33,6 +34,7 @@ func WithExternalEtcd(client *clientv3.Client) Option {
 func WithEmbeddedEtcd(cfg *EmbeddedEtcdCfg) Option {
 	return func(opts *options) {
 		opts.client = initWithEmbedEtcd(cfg)
+		opts.cfg.StorageNode = true
 	}
 }
 

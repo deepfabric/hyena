@@ -203,8 +203,8 @@
   name = "github.com/fagongzi/goetty"
   packages = ["."]
   pruneopts = "UT"
-  revision = "e6119a36a49271bc6625881fdcf33d69d2a90913"
-  version = "v1.1.4"
+  revision = "fbef9f636e216d4001087a9ca723631ab9cd072f"
+  version = "v1.1.5"
 
 [[projects]]
   branch = "master"

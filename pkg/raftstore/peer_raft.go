@@ -1320,11 +1320,12 @@ func (pr *PeerReplicate) sendRaftMsg(msg etcdraftpb.Message) error {
 	sendMsg.DBState = pr.ps.db.State
 
 	sendMsg.From = pr.peer
-	toPeer, ok := pr.store.peers.Load(msg.To)
-	if !ok {
+
+	toPeer := pr.store.getPeer(msg.To)
+	if toPeer == nil {
 		return fmt.Errorf("can not found peer<%d>", msg.To)
 	}
-	sendMsg.To = toPeer.(meta.Peer)
+	sendMsg.To = *toPeer
 	sendMsg.Message = msg
 	pr.store.trans.sendRaftMessage(sendMsg)
 

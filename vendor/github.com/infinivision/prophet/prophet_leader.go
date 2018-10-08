@@ -39,7 +39,7 @@ func (p *Prophet) startLeaderLoop() {
 				}
 
 				if leader != nil {
-					if p.isMatchLeader(leader) {
+					if p.cfg.StorageNode && p.isMatchLeader(leader) {
 						// oh, we are already leader, we may meet something wrong
 						// in previous campaignLeader. we can resign and campaign again.
 						log.Warnf("prophet: leader is matched, resign and campaign again, leader is <%v>",
@@ -57,15 +57,18 @@ func (p *Prophet) startLeaderLoop() {
 						p.leader = leader // reset leader node for forward
 						p.notifyElectionComplete()
 						p.cfg.Handler.BecomeFollower()
+						log.Infof("prophet: leader changed to %v", leader)
 						p.store.WatchLeader()
-						log.Infof("prophet: leader changed, try to campaign leader <%v>", leader)
+						log.Infof("prophet: leader %v out", leader)
 					}
 				}
 
-				log.Debugf("prophet: begin to campaign leader %s",
-					p.node.Name)
-				if err = p.store.CampaignLeader(p.cfg.LeaseTTL, p.enableLeader, p.disableLeader); err != nil {
-					log.Errorf("prophet: campaign leader failure, errors:\n %+v", err)
+				if p.cfg.StorageNode {
+					log.Debugf("prophet: begin to campaign leader %s",
+						p.node.Name)
+					if err = p.store.CampaignLeader(p.cfg.LeaseTTL, p.enableLeader, p.disableLeader); err != nil {
+						log.Errorf("prophet: campaign leader failure, errors:\n %+v", err)
+					}
 				}
 			}
 		}

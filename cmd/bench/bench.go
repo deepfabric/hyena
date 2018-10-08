@@ -10,6 +10,7 @@ import (
 
 	"github.com/fagongzi/log"
 	"github.com/infinivision/hyena/pkg/proxy"
+	"github.com/infinivision/prophet"
 )
 
 var (
@@ -17,13 +18,16 @@ var (
 	cn            = flag.Int64("cn", 64, "The concurrency per client.")
 	dim           = flag.Int64("dim", 128, "dim")
 	num           = flag.Int64("n", 0, "The total number.")
-	timeout       = flag.Int(("timeout"), 200, "timeout ms")
+	timeout       = flag.Int("timeout", 200, "timeout ms")
 	addrs         = flag.String("addrs", "172.19.0.107:9092", "mq addr.")
-	prophetsAddrs = flag.String("addrs-prophet", "172.19.0.101:9529,172.19.0.103:9529，172.19.0.104:9529", "The prophet address.")
+	prophetsAddrs = flag.String("addrs-prophet", "172.19.0.101:9529,172.19.0.103:9529,172.19.0.104:9529", "The prophet address.")
 )
 
 func main() {
 	flag.Parse()
+
+	log.InitLog()
+	prophet.SetLogger(&adapterLog{})
 
 	gCount := *con
 	total := *num
@@ -171,4 +175,44 @@ func (a *analysis) print() {
 	a.prevRecv = a.recv
 	a.prevCost = a.totalCost
 	a.Unlock()
+}
+
+type adapterLog struct{}
+
+func (l *adapterLog) Info(v ...interface{}) {
+	log.Info(v...)
+}
+
+func (l *adapterLog) Infof(format string, v ...interface{}) {
+	log.Infof(format, v...)
+}
+
+func (l *adapterLog) Debug(v ...interface{}) {
+	log.Debug(v...)
+}
+
+func (l *adapterLog) Debugf(format string, v ...interface{}) {
+	log.Debugf(format, v...)
+}
+
+func (l *adapterLog) Warn(v ...interface{}) {
+	log.Warn(v...)
+}
+
+func (l *adapterLog) Warnf(format string, v ...interface{}) {
+	log.Warnf(format, v...)
+}
+
+func (l *adapterLog) Error(v ...interface{}) {}
+
+func (l *adapterLog) Errorf(format string, v ...interface{}) {
+	log.Errorf(format, v...)
+}
+
+func (l *adapterLog) Fatal(v ...interface{}) {
+	log.Fatal(v...)
+}
+
+func (l *adapterLog) Fatalf(format string, v ...interface{}) {
+	log.Fatalf(format, v...)
 }

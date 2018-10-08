@@ -5,10 +5,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fagongzi/util/hack"
-
 	"github.com/fagongzi/goetty"
 	"github.com/fagongzi/log"
+	"github.com/fagongzi/util/hack"
 	"github.com/fagongzi/util/uuid"
 	"github.com/infinivision/hyena/pkg/pb/meta"
 	"github.com/infinivision/hyena/pkg/pb/rpc"
@@ -17,29 +16,35 @@ import (
 
 type asyncContext struct {
 	sync.Mutex
-	timeouts            sync.Map
-	completeC, timeoutC chan struct{}
-	to, received        uint64
-	distances           []float32
-	ids                 []int64
+	timeouts     sync.Map
+	completeC    chan struct{}
+	to, received uint64
+	distances    []float32
+	ids          []int64
 }
 
-func (ctx *asyncContext) addTimeout(id interface{}, timeout *goetty.Timeout) {
-	ctx.timeouts.Store(id, timeout)
+func (ctx *asyncContext) addTimeout(id interface{}, timeout time.Duration) {
+	t, err := util.DefaultTimeoutWheel().Schedule(timeout, ctx.onTimeout, id)
+	if err != nil {
+		log.Fatal("bug: timeout can not added failed")
+	}
+	ctx.timeouts.Store(id, &t)
 }
 
-func (ctx *asyncContext) done(rsp *rpc.SearchResponse) {
-	ctx.timeouts.Delete(hack.SliceToString(rsp.ID))
-	if value, ok := ctx.timeouts.Load(hack.SliceToString(rsp.ID)); ok {
+func (ctx *asyncContext) done(id interface{}, rsp *rpc.SearchResponse) {
+	if value, ok := ctx.timeouts.Load(id); ok {
+		ctx.timeouts.Delete(id)
 		value.(*goetty.Timeout).Stop()
-		ctx.Lock()
-		for idx, value := range rsp.Xids {
-			if value != -1 && betterThan(rsp.Distances[idx], ctx.distances[idx]) {
-				ctx.distances[idx] = rsp.Distances[idx]
-				ctx.ids[idx] = value
+		if nil != rsp {
+			ctx.Lock()
+			for idx, value := range rsp.Xids {
+				if value != -1 && betterThan(rsp.Distances[idx], ctx.distances[idx]) {
+					ctx.distances[idx] = rsp.Distances[idx]
+					ctx.ids[idx] = value
+				}
 			}
+			ctx.Unlock()
 		}
-		ctx.Unlock()
 	}
 
 	newV := atomic.AddUint64(&ctx.received, 1)
@@ -48,21 +53,15 @@ func (ctx *asyncContext) done(rsp *rpc.SearchResponse) {
 	}
 }
 
-func (ctx *asyncContext) onTimeout(arg interface{}) {
-	if _, ok := ctx.timeouts.Load(arg); ok {
-		ctx.timeoutC <- struct{}{}
+func (ctx *asyncContext) onTimeout(id interface{}) {
+	if _, ok := ctx.timeouts.Load(id); ok {
+		ctx.done(id, nil)
 	}
 }
 
 func (ctx *asyncContext) get(timeout time.Duration) ([]float32, []int64, error) {
-	util.DefaultTimeoutWheel().Schedule(timeout, ctx.onTimeout, nil)
-
-	select {
-	case <-ctx.completeC:
-		return ctx.distances, ctx.ids, nil
-	case <-ctx.timeoutC:
-		return ctx.distances, ctx.ids, nil
-	}
+	<-ctx.completeC
+	return ctx.distances, ctx.ids, nil
 }
 
 func (ctx *asyncContext) reset() {
@@ -81,26 +80,17 @@ func (ctx *asyncContext) reset() {
 	for {
 		select {
 		case <-ctx.completeC:
-		case <-ctx.timeoutC:
 		default:
 			close(ctx.completeC)
-			close(ctx.timeoutC)
 			return
 		}
 	}
 }
 
-func (r *router) onTimeout(arg interface{}) {
-	r.ctxs.Delete(arg)
-}
-
 func (r *router) addAsyncCtx(ctx *asyncContext, req *rpc.SearchRequest) {
-	r.ctxs.Store(key(req.ID), ctx)
-	timeout, err := util.DefaultTimeoutWheel().Schedule(r.timeout, r.onTimeout, key(req.ID))
-	if err != nil {
-		log.Fatal("bug: timeout can not added failed")
-	}
-	ctx.addTimeout(key(req.ID), &timeout)
+	id := key(req.ID)
+	ctx.addTimeout(id, r.timeout)
+	r.ctxs.Store(id, ctx)
 }
 
 func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
@@ -109,7 +99,6 @@ func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
 	r.RLock()
 	l := len(req.Xq)
 	ctx.to = uint64(len(r.dbs))
-	ctx.timeoutC = make(chan struct{}, ctx.to)
 	ctx.completeC = make(chan struct{}, 1)
 	ctx.distances = make([]float32, l, l)
 	ctx.ids = make([]int64, l, l)
@@ -131,10 +120,18 @@ func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
 
 func (r *router) onResponse(msg interface{}) {
 	if rsp, ok := msg.(*rpc.SearchResponse); ok {
-		value, ok := r.ctxs.Load(key(rsp.ID))
+		id := key(rsp.ID)
+		value, ok := r.ctxs.Load(id)
 		if ok {
-			r.ctxs.Delete(key(rsp.ID))
-			value.(*asyncContext).done(rsp)
+			r.ctxs.Delete(id)
+			value.(*asyncContext).done(id, rsp)
+		}
+	} else if rsp, ok := msg.(*rpc.ErrResponse); ok {
+		id := key(rsp.ID)
+		value, ok := r.ctxs.Load(id)
+		if ok {
+			r.ctxs.Delete(id)
+			value.(*asyncContext).done(id, nil)
 		}
 	}
 }

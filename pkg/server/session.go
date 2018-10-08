@@ -43,12 +43,13 @@ func (s *session) resp(rsp interface{}) {
 	s.resps.Put(rsp)
 }
 
-func (s *session) writeLoop() {
+func (s *session) writeLoop(stopC chan struct{}) {
 	items := make([]interface{}, batch, batch)
 
 	for {
 		n, err := s.resps.Get(batch, items)
 		if nil != err {
+			stopC <- struct{}{}
 			return
 		}
 
@@ -56,6 +57,7 @@ func (s *session) writeLoop() {
 			item := items[i]
 			if item == closedFlag {
 				s.release()
+				stopC <- struct{}{}
 				return
 			}
 			s.conn.Write(items[i])

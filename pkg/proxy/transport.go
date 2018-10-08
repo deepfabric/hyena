@@ -62,7 +62,7 @@ func (t *transport) call(items []interface{}, n int64) error {
 
 	rsps := make([]interface{}, n, n)
 	for i := int64(0); i < n; i++ {
-		rsp, err := t.conn.ReadTimeout(time.Second)
+		rsp, err := t.conn.Read()
 		if err != nil {
 			return err
 		}
@@ -94,9 +94,9 @@ OUTER:
 			}
 
 			log.Infof("transport: %d request sent to store %s failed, %+v, retry",
-				len(items),
-				err,
-				t.addr)
+				n,
+				t.addr,
+				err)
 			t.resetConn()
 		}
 	}

@@ -50,10 +50,11 @@ type Cfg struct {
 	// MaxRPCTimeout rpc max timeout
 	MaxRPCTimeout time.Duration
 
-	Namespace  string
-	LeaseTTL   int64
-	Schedulers []Scheduler
-	Handler    RoleChangeHandler
+	Namespace   string
+	StorageNode bool
+	LeaseTTL    int64
+	Schedulers  []Scheduler
+	Handler     RoleChangeHandler
 }
 
 func (c *Cfg) adujst() {
