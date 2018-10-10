@@ -84,6 +84,16 @@ func (pr *PeerReplicate) addRequest(req *reqCtx) error {
 	return nil
 }
 
+func (pr *PeerReplicate) addSearchRequest(req *reqCtx) error {
+	err := pr.searches.Put(req)
+	if err != nil {
+		return err
+	}
+
+	pr.addEvent()
+	return nil
+}
+
 func (pr *PeerReplicate) addRequestFromMQ(req interface{}) error {
 	err := pr.mqRequests.Put(req)
 	if err != nil {
@@ -155,6 +165,7 @@ func (pr *PeerReplicate) readyToServeRaft(ctx context.Context) {
 		pr.handleTick(items)
 		pr.handleReport(items)
 		pr.handleRequest(items)
+		pr.handleSearch(items)
 		pr.handleRequestFromMQ(items)
 
 		pr.handleApplyResult(items)
@@ -176,7 +187,18 @@ func (pr *PeerReplicate) handleStop() {
 		releaseAsyncApplyResult(result.(*asyncApplyResult))
 	}
 
+	if pr.isWritable() {
+		pr.cond.Broadcast()
+	}
+
 	// resp all stale requests in batch and queue
+	searches := pr.searches.Dispose()
+	for _, r := range searches {
+		c := r.(*reqCtx)
+		c.cbErr(c.search.ID, errorStoreNotMatch())
+		releaseReqCtx(c)
+	}
+
 	requests := pr.requests.Dispose()
 	for _, r := range requests {
 		req := r.(*reqCtx)
@@ -355,6 +377,28 @@ func (pr *PeerReplicate) handleRequest(items []interface{}) {
 	}
 
 	if pr.requests.Len() > 0 {
+		pr.addEvent()
+	}
+}
+
+func (pr *PeerReplicate) handleSearch(items []interface{}) {
+	size := pr.searches.Len()
+	if size == 0 {
+		return
+	}
+
+	n, err := pr.searches.Get(batch, items)
+	if err != nil {
+		return
+	}
+
+	for i := int64(0); i < n; i++ {
+		c := items[i].(*reqCtx)
+		pr.execSearch(c.search, c.cb, c.cbErr)
+		releaseReqCtx(c)
+	}
+
+	if pr.searches.Len() > 0 {
 		pr.addEvent()
 	}
 }

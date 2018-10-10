@@ -49,6 +49,7 @@ type PeerReplicate struct {
 	reports          *util.Queue
 	applyResults     *util.Queue
 	requests         *util.Queue
+	searches         *util.Queue
 	mqRequests       *util.Queue
 	mqUpdateRequests *util.Queue
 	actions          *util.Queue
@@ -115,6 +116,7 @@ func newPeerReplicate(store *Store, db *meta.VectorDB, peerID uint64) (*PeerRepl
 	pr.reports = util.New(0)
 	pr.applyResults = util.New(0)
 	pr.requests = util.New(0)
+	pr.searches = util.New(0)
 	pr.mqRequests = util.New(0)
 	pr.actions = util.New(0)
 	pr.mqUpdateRequests = util.New(0)
@@ -331,11 +333,6 @@ func (pr *PeerReplicate) onUpdate(req *rpc.UpdateRequest, cb func(interface{}), 
 		cbErr(req.ID, errorStoreNotMatch())
 		util.ReleaseUpdateReq(req)
 	}
-}
-
-func (pr *PeerReplicate) onSearch(req *rpc.SearchRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
-	pr.waitInsertCommitted(req)
-	pr.execSearch(req, cb, cbErr)
 }
 
 func (pr *PeerReplicate) waitInsertCommitted(req *rpc.SearchRequest) {

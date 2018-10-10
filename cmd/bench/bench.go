@@ -46,6 +46,12 @@ func main() {
 	var index int64
 	mqs := strings.Split(*addrs, ",")
 	prophets := strings.Split(*prophetsAddrs, ",")
+	vdb, err := proxy.NewMQBasedProxy("hyena", mqs, prophets, proxy.WithSearchTimeout(time.Duration(*timeout)*time.Millisecond))
+	if err != nil {
+		log.Fatalf("new proxy: %+v", err)
+		return
+	}
+
 	for index = 0; index < gCount; index++ {
 		start := index * countPerG
 		end := (index + 1) * countPerG
@@ -55,7 +61,7 @@ func main() {
 
 		wg.Add(1)
 		complate.Add(1)
-		go startG(end-start, wg, complate, ready, ans, mqs, prophets)
+		go startG(end-start, wg, complate, ready, ans, vdb)
 	}
 
 	wg.Wait()
@@ -77,15 +83,9 @@ func main() {
 	ans.print()
 }
 
-func startG(total int64, wg, complate *sync.WaitGroup, ready chan struct{}, ans *analysis, mqs, prophets []string) {
+func startG(total int64, wg, complate *sync.WaitGroup, ready chan struct{}, ans *analysis, vdb proxy.Proxy) {
 	if total <= 0 {
 		total = math.MaxInt64
-	}
-
-	vdb, err := proxy.NewMQBasedProxy("hyena", mqs, prophets, proxy.WithSearchTimeout(time.Duration(*timeout)*time.Millisecond))
-	if err != nil {
-		log.Fatalf("new proxy: %+v", err)
-		return
 	}
 
 	wg.Done()

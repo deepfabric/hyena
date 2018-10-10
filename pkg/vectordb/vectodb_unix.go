@@ -3,11 +3,16 @@
 package vectordb
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
 	"github.com/infinivision/hyena/pkg/util"
 	"github.com/infinivision/vectodb"
+)
+
+var (
+	destoryErr = fmt.Errorf("db was already destoryed")
 )
 
 const (
@@ -38,10 +43,15 @@ type db struct {
 	dim, flatThr int
 	distThr      float32
 	vdb          *vectodb.VectoDB
+	destroy      bool
 }
 
 func (d *db) UpdateWithIds(extXb []float32, extXids []int64) error {
 	d.Lock()
+	if d.destroy {
+		d.Unlock()
+		return destoryErr
+	}
 	err := d.vdb.UpdateWithIds(extXb, extXids)
 	d.Unlock()
 	return err
@@ -49,28 +59,51 @@ func (d *db) UpdateWithIds(extXb []float32, extXids []int64) error {
 
 func (d *db) AddWithIds(newXb []float32, newXids []int64) error {
 	d.Lock()
+	if d.destroy {
+		d.Unlock()
+		return destoryErr
+	}
 	err := d.vdb.AddWithIds(newXb, newXids)
 	d.Unlock()
 	return err
 }
 
 func (d *db) Search(xq, distances []float32, xids []int64) (int, error) {
-	return d.vdb.Search(xq, distances, xids)
+	d.RLock()
+	if d.destroy {
+		d.RUnlock()
+		return 0, destoryErr
+	}
+	value, err := d.vdb.Search(xq, distances, xids)
+	d.RUnlock()
+	return value, err
 }
 
 func (d *db) UpdateIndex() error {
-	return d.vdb.UpdateIndex()
+	d.Lock()
+	if d.destroy {
+		d.Unlock()
+		return destoryErr
+	}
+	err := d.vdb.UpdateIndex()
+	d.Unlock()
+	return err
 }
 
 func (d *db) Destroy() error {
 	d.Lock()
 	err := d.vdb.Destroy()
+	d.destroy = true
 	d.Unlock()
 	return err
 }
 
 func (d *db) Clean() error {
 	d.Lock()
+	if d.destroy {
+		d.Unlock()
+		return destoryErr
+	}
 	err := os.RemoveAll(d.path)
 	d.Unlock()
 	return err
@@ -78,6 +111,10 @@ func (d *db) Clean() error {
 
 func (d *db) Records() (uint64, error) {
 	d.RLock()
+	if d.destroy {
+		d.RUnlock()
+		return 0, destoryErr
+	}
 	value, err := d.vdb.GetTotal()
 	d.RUnlock()
 	return uint64(value), err
@@ -85,6 +122,10 @@ func (d *db) Records() (uint64, error) {
 
 func (d *db) CreateSnap(path string) error {
 	d.Lock()
+	if d.destroy {
+		d.Unlock()
+		return destoryErr
+	}
 	err := util.GZIPTo(d.path, path)
 	d.Unlock()
 	return err
@@ -92,6 +133,10 @@ func (d *db) CreateSnap(path string) error {
 
 func (d *db) ApplySnap(path string) error {
 	d.Lock()
+	if d.destroy {
+		d.Unlock()
+		return destoryErr
+	}
 	err := os.RemoveAll(d.path)
 	if err != nil {
 		d.Unlock()
@@ -114,5 +159,6 @@ func (d *db) resetDB() error {
 	}
 
 	d.vdb = vdb
+	d.destroy = false
 	return nil
 }

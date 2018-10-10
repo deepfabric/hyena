@@ -13,7 +13,20 @@ func (s *Store) HandleSearch(req *rpc.SearchRequest, cb func(interface{}), cbErr
 		return
 	}
 
-	pr.onSearch(req, cb, cbErr)
+	pr.waitInsertCommitted(req)
+
+	ctx := acquireReqCtx()
+	ctx.search = req
+	ctx.msgType = int32(rpc.MsgSearchReq)
+	ctx.cb = cb
+	ctx.cbErr = cbErr
+
+	err := pr.addSearchRequest(ctx)
+	if err != nil {
+		releaseReqCtx(ctx)
+		cbErr(req.ID, errorOtherCMDResp(err))
+		return
+	}
 }
 
 // HandleInsert handle insert request
@@ -27,6 +40,8 @@ func (s *Store) HandleInsert(req *rpc.InsertRequest, cb func(interface{}), cbErr
 	ctx := acquireReqCtx()
 	ctx.insert = req
 	ctx.msgType = int32(rpc.MsgInsertReq)
+	ctx.cb = cb
+	ctx.cbErr = cbErr
 
 	err := pr.addRequest(ctx)
 	if err != nil {
@@ -47,8 +62,10 @@ func (s *Store) HandleUpdate(req *rpc.UpdateRequest, cb func(interface{}), cbErr
 	ctx := acquireReqCtx()
 	ctx.update = req
 	ctx.msgType = int32(rpc.MsgUpdateReq)
-	err := pr.addRequest(ctx)
+	ctx.cb = cb
+	ctx.cbErr = cbErr
 
+	err := pr.addRequest(ctx)
 	if err != nil {
 		releaseReqCtx(ctx)
 		cbErr(req.ID, errorOtherCMDResp(err))

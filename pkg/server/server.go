@@ -115,7 +115,7 @@ func (s *Server) doConnection(conn goetty.IOSession) error {
 
 	// The session usually is a proxy, the proxy can send insert,update,search.
 	for {
-		req, err := conn.ReadTimeout(s.opts.timeoutRead)
+		req, err := conn.Read()
 		if err != nil {
 			s.sessions.Delete(session.id)
 			session.close()

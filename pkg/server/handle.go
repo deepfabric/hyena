@@ -41,7 +41,7 @@ func (s *Server) handleResponse(rsp interface{}) {
 }
 
 func (s *Server) handleErrResponse(uuid []byte, err *raftpb.Error) {
-	s.doResp(uuid, err)
+	s.doResp(hack.SliceToString(uuid), err)
 }
 
 func (s *Server) doResp(id interface{}, value interface{}) {
