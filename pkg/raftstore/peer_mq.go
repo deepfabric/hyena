@@ -95,7 +95,7 @@ func (pr *PeerReplicate) doStartConsumerLoops(offset int64) {
 		for {
 			message, ok := <-pr.consumer.Messages()
 			if !ok {
-				log.Errorf("raftstore[db-%d]: mq consumer read loop exit",
+				log.Warnf("raftstore[db-%d]: mq consumer read loop exit",
 					pr.id)
 				return
 			}

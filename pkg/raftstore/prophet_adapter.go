@@ -68,7 +68,7 @@ func (pa *ProphetAdapter) FetchContainerHB() *prophet.ContainerHeartbeatReq {
 	req := new(prophet.ContainerHeartbeatReq)
 	req.Container = &ContainerAdapter{meta: pa.store.meta}
 	req.StorageCapacity = stats.Total
-	req.StorageAvailable = stats.Free
+	req.StorageAvailable = stats.Available
 	req.ApplyingSnapCount = st.applyingSnapCount
 	req.LeaderCount = st.dbLeaderCount
 	req.ReplicaCount = st.dbCount
