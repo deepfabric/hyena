@@ -147,6 +147,9 @@ func newPeerReplicate(store *Store, db *meta.VectorDB, peerID uint64) (*PeerRepl
 	id, _ = store.runner.RunCancelableTask(pr.asyncExecUpdates)
 	pr.cancelTaskIds = append(pr.cancelTaskIds, id)
 
+	id, _ = store.runner.RunCancelableTask(ps.rebuildIndex)
+	pr.cancelTaskIds = append(pr.cancelTaskIds, id)
+
 	return pr, nil
 }
 

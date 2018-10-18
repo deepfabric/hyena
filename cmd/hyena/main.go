@@ -101,9 +101,11 @@ var (
 	maxPeerDownTimeSec        = flag.Int("raft-max-peer-down", 5*60, "Raft(sec): Max peer downtime")
 
 	// about vectordb
-	dim     = flag.Int("dim", 512, "vector dim")
-	flatThr = flag.Int("flat", 1000, "vector flatThr")
-	distThr = flag.Float64("dist", 0.6, "vector distThr")
+	dim                     = flag.Int("dim", 512, "VectorDB: dim")
+	flatThr                 = flag.Int("flat", 1000, "VectorDB: flatThr")
+	distThr                 = flag.Float64("dist", 0.6, "VectorDB: distThr")
+	limitRebuildIndex       = flag.Int("limit-rebuild", 2, "VectorDB: Max number of vectordbs to rebuild index")
+	rebuildIndexIntervalSec = flag.Int("rebuild-interval", 10, "VectorDB(sec): rebuild index interval")
 
 	// about nsq
 	topic       = flag.String("mq-topic", "", "MQ: topic")
@@ -272,7 +274,7 @@ func parseOptions() []server.Option {
 	opts = append(opts, server.WithRaftOption(raftstore.WithRaftLogCompactDuration(time.Second*time.Duration(*raftLogCompactDurationSec))))
 	opts = append(opts, server.WithRaftOption(raftstore.WithSyncWrite(*syncWrite)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithMaxBatchingSize(*maxBatchingSize)))
-	opts = append(opts, server.WithRaftOption(raftstore.WithMaxDBRecords(*maxDBRecordsMillion)))
+	opts = append(opts, server.WithRaftOption(raftstore.WithMaxDBRecords(*maxDBRecordsMillion*million)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithSentRaftWorkerCount(*sentRaftWorkerCount)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithSentSnapWorkerCount(*sentSnapWorkerCount)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithApplyWorkerCount(*applyWorkerCount)))
@@ -284,6 +286,8 @@ func parseOptions() []server.Option {
 	opts = append(opts, server.WithRaftOption(raftstore.WithDim(*dim)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithFlatThr(*flatThr)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithDistThr(float32(*distThr))))
+	opts = append(opts, server.WithRaftOption(raftstore.WithLimitRebuildIndex(*limitRebuildIndex)))
+	opts = append(opts, server.WithRaftOption(raftstore.WithRebuildIndexDuration(time.Second*time.Duration(*rebuildIndexIntervalSec))))
 	opts = append(opts, server.WithRaftOption(raftstore.WithMQ(*topic, *groupPrefix, strings.Split(*mqAddr, ","))))
 	return opts
 }

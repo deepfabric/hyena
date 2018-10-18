@@ -238,6 +238,20 @@ func WithDistThr(value float32) Option {
 	}
 }
 
+// WithLimitRebuildIndex set LimitRebuildIndex
+func WithLimitRebuildIndex(value int) Option {
+	return func(opts *options) {
+		opts.cfg.LimitRebuildIndex = value
+	}
+}
+
+// WithRebuildIndexDuration set RebuildIndexDuration
+func WithRebuildIndexDuration(value time.Duration) Option {
+	return func(opts *options) {
+		opts.cfg.RebuildIndexDuration = value
+	}
+}
+
 // WithMQ set mq
 func WithMQ(topic, groupPrefix string, mqAddrs []string) Option {
 	return func(opts *options) {

@@ -16,6 +16,7 @@ import (
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
 	"github.com/infinivision/hyena/pkg/util"
 	"github.com/infinivision/prophet"
+	"golang.org/x/time/rate"
 )
 
 const (
@@ -48,7 +49,8 @@ type Store struct {
 	startAt            uint32
 	reveivingSnapCount uint64
 
-	firstDBLoaded uint64
+	firstDBLoaded       uint64
+	rebuildIndexLimiter *rate.Limiter
 }
 
 // NewStore returns store
@@ -91,6 +93,7 @@ func NewStoreWithCfg(meta meta.Store, cfg *Cfg) *Store {
 	s.runner.AddNamedWorker(logCompactWorker)
 	s.runner.AddNamedWorker(genSnapWorker)
 
+	s.rebuildIndexLimiter = rate.NewLimiter(rate.Every(cfg.RebuildIndexDuration/time.Duration(cfg.LimitRebuildIndex)), cfg.LimitRebuildIndex)
 	return s
 }
 
@@ -174,39 +177,28 @@ func (s *Store) startDBs() {
 		log.Fatalf("raftstore: init store write failed, errors:\n %+v", err)
 	}
 
-	var wg sync.WaitGroup
 	for i := len(states) - 1; i >= 0; i-- {
 		state := states[i]
-		wg.Add(1)
 
-		f := func(state *raftpb.DBLocalState) {
-			defer wg.Done()
-
-			db := &state.DB
-			pr, err := createPeerReplicate(s, db)
-			if err != nil {
-				log.Fatalf("raftstore: init store failed, errors:\n %+v", err)
-			}
-
-			if state.State == raftpb.Applying {
-				applyingCount++
-				log.Infof("raftstore[db-%d]: applying in store", db.ID)
-				pr.startApplySnapJob()
-			}
-
-			pr.startRegistrationJob()
-			s.replicates.Store(db.ID, pr)
+		db := &state.DB
+		pr, err := createPeerReplicate(s, db)
+		if err != nil {
+			log.Fatalf("raftstore: init store failed, errors:\n %+v", err)
 		}
+
+		if state.State == raftpb.Applying {
+			applyingCount++
+			log.Infof("raftstore[db-%d]: applying in store", db.ID)
+			pr.startApplySnapJob()
+		}
+
+		pr.startRegistrationJob()
+		s.replicates.Store(db.ID, pr)
 
 		if i == len(states)-1 {
-			f(state)
 			atomic.StoreUint64(&s.firstDBLoaded, 1)
-		} else {
-			go f(state)
 		}
 	}
-
-	wg.Wait()
 
 	if len(states) == 0 {
 		atomic.StoreUint64(&s.firstDBLoaded, 1)

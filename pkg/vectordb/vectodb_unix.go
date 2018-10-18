@@ -33,38 +33,40 @@ func newVectodb(path string, dim, flatThr int, distThr float32) (DB, error) {
 		distThr: distThr,
 		flatThr: flatThr,
 		vdb:     vdb,
+		destroy: false,
+		hasData: true,
 	}, nil
 }
 
 type db struct {
 	sync.RWMutex
 
-	path         string
-	dim, flatThr int
-	distThr      float32
-	vdb          *vectodb.VectoDB
-	destroy      bool
+	path             string
+	dim, flatThr     int
+	distThr          float32
+	vdb              *vectodb.VectoDB
+	destroy, hasData bool
 }
 
 func (d *db) UpdateWithIds(extXb []float32, extXids []int64) error {
-	d.Lock()
+	d.RLock()
 	if d.destroy {
-		d.Unlock()
+		d.RUnlock()
 		return destoryErr
 	}
 	err := d.vdb.UpdateWithIds(extXb, extXids)
-	d.Unlock()
+	d.RUnlock()
 	return err
 }
 
 func (d *db) AddWithIds(newXb []float32, newXids []int64) error {
-	d.Lock()
+	d.RLock()
 	if d.destroy {
-		d.Unlock()
+		d.RUnlock()
 		return destoryErr
 	}
 	err := d.vdb.AddWithIds(newXb, newXids)
-	d.Unlock()
+	d.RUnlock()
 	return err
 }
 
@@ -80,13 +82,17 @@ func (d *db) Search(xq, distances []float32, xids []int64) (int, error) {
 }
 
 func (d *db) UpdateIndex() error {
-	d.Lock()
+	d.RLock()
 	if d.destroy {
-		d.Unlock()
+		d.RUnlock()
 		return destoryErr
 	}
+	if !d.hasData {
+		d.RUnlock()
+		return nil
+	}
 	err := d.vdb.UpdateIndex()
-	d.Unlock()
+	d.RUnlock()
 	return err
 }
 
@@ -104,6 +110,7 @@ func (d *db) Clean() error {
 		d.Unlock()
 		return destoryErr
 	}
+	d.hasData = false
 	err := os.RemoveAll(d.path)
 	d.Unlock()
 	return err
@@ -144,6 +151,7 @@ func (d *db) ApplySnap(path string) error {
 	}
 	err = os.Rename(path, d.path)
 	if err != nil {
+		d.Unlock()
 		return err
 	}
 
@@ -160,5 +168,6 @@ func (d *db) resetDB() error {
 
 	d.vdb = vdb
 	d.destroy = false
+	d.hasData = true
 	return nil
 }

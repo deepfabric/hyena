@@ -31,7 +31,7 @@ func (pa *ProphetAdapter) NewContainer() prophet.Container {
 func (pa *ProphetAdapter) FetchResourceHB(id uint64) *prophet.ResourceHeartbeatReq {
 	pr := pa.store.getDB(id, false)
 	if pr == nil {
-		log.Fatal("bug: missing replica")
+		return nil
 	}
 
 	return getResourceHB(pr)
@@ -45,7 +45,11 @@ func (pa *ProphetAdapter) FetchAllResourceHB() []*prophet.ResourceHeartbeatReq {
 		pr.checkPeers()
 
 		if pr.isLeader() {
-			values = append(values, getResourceHB(pr))
+			hb := getResourceHB(pr)
+			if hb != nil {
+				values = append(values, hb)
+			}
+
 		}
 
 		return true

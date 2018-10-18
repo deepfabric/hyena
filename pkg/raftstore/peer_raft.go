@@ -187,7 +187,7 @@ func (pr *PeerReplicate) handleStop() {
 		releaseAsyncApplyResult(result.(*asyncApplyResult))
 	}
 
-	if pr.isWritable() {
+	if pr.isWritable() && pr.cond != nil {
 		pr.cond.Broadcast()
 	}
 

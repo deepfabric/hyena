@@ -1,9 +1,11 @@
 package raftstore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/Shopify/sarama"
 	etcdraft "github.com/coreos/etcd/raft"
@@ -31,10 +33,9 @@ const (
 type peerStorage struct {
 	sync.RWMutex
 
-	store     *Store
-	db        meta.VectorDB
-	vdb       vectordb.DB
-	destroied bool
+	store *Store
+	db    meta.VectorDB
+	vdb   vectordb.DB
 
 	lastTerm         uint64
 	appliedIndexTerm uint64
@@ -94,20 +95,49 @@ func newPeerStorage(store *Store, db meta.VectorDB) (*peerStorage, error) {
 	return ps, nil
 }
 
-func (ps *peerStorage) destroy() {
-	ps.Lock()
-	if !ps.destroied {
-		err := ps.vdb.Destroy()
-		if err != nil {
+func (ps *peerStorage) rebuildIndex(ctx context.Context) {
+	ticker := time.NewTicker(ps.store.cfg.RebuildIndexDuration)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Infof("raftstore[db-%d]: rebuild index loop exit",
+				ps.db.ID)
+			return
+		case <-ticker.C:
+			err := ps.store.rebuildIndexLimiter.Wait(ctx)
 			if err != nil {
-				log.Fatalf("raftstore-[db-%d]: destroy vectordb instance failed, errors:%+v",
+				log.Errorf("raftstore[db-%d]: rebuild index failed, errors:%+v",
 					ps.db.ID,
 					err)
+				return
 			}
+
+			log.Infof("raftstore[db-%d]: rebuild index start",
+				ps.db.ID)
+			err = ps.vdb.UpdateIndex()
+			if err != nil {
+				log.Errorf("raftstore[db-%d]: rebuild index failed, errors:%+v",
+					ps.db.ID,
+					err)
+				return
+			}
+			log.Infof("raftstore[db-%d]: rebuild index complete",
+				ps.db.ID)
 		}
-		ps.destroied = true
 	}
-	ps.Unlock()
+}
+
+func (ps *peerStorage) destroy() {
+	err := ps.vdb.Destroy()
+	if err != nil {
+		if err != nil {
+			log.Errorf("raftstore-[db-%d]: destroy vectordb instance failed, errors:%+v",
+				ps.db.ID,
+				err)
+		}
+	}
 }
 
 func (ps *peerStorage) initRaftLocalState() error {

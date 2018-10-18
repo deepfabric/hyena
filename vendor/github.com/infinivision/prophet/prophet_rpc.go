@@ -105,7 +105,12 @@ func (rpc *simpleRPC) TiggerResourceHeartbeat(id uint64) {
 	}
 
 	for {
-		err = conn.c.WriteAndFlush(rpc.prophet.adapter.FetchResourceHB(id))
+		hb := rpc.prophet.adapter.FetchResourceHB(id)
+		if hb == nil {
+			return
+		}
+
+		err = conn.c.WriteAndFlush(hb)
 		if err != nil {
 			rpc.closeConn(conn)
 			return

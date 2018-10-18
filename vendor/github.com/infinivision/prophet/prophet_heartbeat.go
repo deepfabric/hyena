@@ -34,6 +34,10 @@ func (p *Prophet) startResourceHeartbeatLoop() {
 				hbs := p.adapter.FetchAllResourceHB()
 				var err error
 				for _, hb := range hbs {
+					if hb == nil {
+						continue
+					}
+
 					err = conn.WriteAndFlush(hb)
 					if err != nil {
 						conn.Close()

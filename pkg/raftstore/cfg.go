@@ -54,9 +54,11 @@ type Cfg struct {
 	StoreHBInterval time.Duration
 
 	// about vectordb
-	Dim     int
-	FlatThr int
-	DistThr float32
+	Dim                  int
+	FlatThr              int
+	DistThr              float32
+	LimitRebuildIndex    int
+	RebuildIndexDuration time.Duration
 
 	// about mq
 	Topic, GroupPrefix string
