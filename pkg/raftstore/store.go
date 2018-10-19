@@ -416,7 +416,9 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 	// check range overlapped
 	// if we have the writeable db, and has overlapped with new db, we cann't create the replicate
 	pr := s.getWriteableDB(false)
-	if pr != nil && pr.ps.db.Start+s.cfg.MaxDBRecords <= msg.Start {
+	if pr != nil &&
+		pr.id < msg.ID && // if the new db'id is small then the writeable db, cant't be overlap
+		pr.ps.db.Start+s.cfg.MaxDBRecords <= msg.Start {
 		log.Infof("raftstore[db-%d]: start %d overlapped with db-%d start with %d",
 			msg.ID,
 			msg.Start,
