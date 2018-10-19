@@ -146,7 +146,7 @@ func (r *replicaChecker) selectBestPeer(target *ResourceRuntime, allocPeerID boo
 		return nil, 0
 	}
 
-	newPeer, err := allocPeer(bestContainer.meta.ID(), r.rt.p.store)
+	newPeer, err := allocPeer(bestContainer.meta.ID(), r.rt.p.store, allocPeerID)
 	if err != nil {
 		log.Errorf("scheduler: allocate peer failure, errors:\n %+v", err)
 		return nil, 0
@@ -244,18 +244,17 @@ func compareContainerScore(containerA *ContainerRuntime, scoreA float64, contain
 	return 0
 }
 
-func allocPeer(containerID uint64, store Store) (*Peer, error) {
-	if store != nil {
+func allocPeer(containerID uint64, store Store, allocPeerID bool) (*Peer, error) {
+	value := &Peer{ContainerID: containerID}
+
+	if allocPeerID {
 		peerID, err := store.AllocID()
 		if err != nil {
 			return nil, err
 		}
 
-		return &Peer{
-			ID:          peerID,
-			ContainerID: containerID,
-		}, nil
+		value.ID = peerID
 	}
 
-	return &Peer{ContainerID: containerID}, nil
+	return value, nil
 }

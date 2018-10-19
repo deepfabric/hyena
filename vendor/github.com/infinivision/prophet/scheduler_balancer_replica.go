@@ -71,7 +71,7 @@ func (s *balanceReplicaScheduler) transferPeer(rt *Runtime, res *ResourceRuntime
 	scoreGuard := NewDistinctScoreFilter(s.cfg, containers, source)
 
 	checker := newReplicaChecker(s.cfg, rt)
-	newPeer, _ := checker.selectBestPeer(res, true, scoreGuard)
+	newPeer, _ := checker.selectBestPeer(res, false, scoreGuard)
 	if newPeer == nil {
 		return nil
 	}
@@ -80,6 +80,13 @@ func (s *balanceReplicaScheduler) transferPeer(rt *Runtime, res *ResourceRuntime
 	if !shouldBalance(source, target, s.ResourceKind()) {
 		return nil
 	}
+
+	id, err := checker.rt.p.store.AllocID()
+	if err != nil {
+		log.Errorf("prophet: allocate peer failure, %+v", err)
+		return nil
+	}
+	newPeer.ID = id
 
 	s.limit = adjustBalanceLimit(rt, s.ResourceKind())
 	return newTransferPeerAggregationOp(s.cfg, res, oldPeer, newPeer)
