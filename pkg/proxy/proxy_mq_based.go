@@ -86,14 +86,14 @@ func (p *mqBasedProxy) AddWithIds(newXb []float32, newXids []int64) error {
 	return p.doPublish(req, req.Size())
 }
 
-func (p *mqBasedProxy) Search(xq []float32) ([]float32, []int64, error) {
+func (p *mqBasedProxy) Search(xq []float32) (uint64, []float32, []int64, error) {
 	req := acquireRequest()
 	req.Offset = p.getOffset()
 	req.Xq = xq
 
-	ds, ids, err := p.router.search(req)
+	db, ds, ids, err := p.router.search(req)
 	releaseRequest(req)
-	return ds, ids, err
+	return db, ds, ids, err
 }
 
 func (p *mqBasedProxy) doPublish(req interface{}, size int) error {

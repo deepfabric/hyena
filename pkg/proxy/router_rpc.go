@@ -19,6 +19,7 @@ type asyncContext struct {
 	timeouts     sync.Map
 	completeC    chan struct{}
 	to, received uint64
+	db           uint64
 	distances    []float32
 	ids          []int64
 }
@@ -41,6 +42,7 @@ func (ctx *asyncContext) done(id interface{}, rsp *rpc.SearchResponse) {
 				if value != -1 && betterThan(rsp.Distances[idx], ctx.distances[idx]) {
 					ctx.distances[idx] = rsp.Distances[idx]
 					ctx.ids[idx] = value
+					ctx.db = rsp.DB
 				}
 			}
 			ctx.Unlock()
@@ -59,9 +61,9 @@ func (ctx *asyncContext) onTimeout(id interface{}) {
 	}
 }
 
-func (ctx *asyncContext) get(timeout time.Duration) ([]float32, []int64, error) {
+func (ctx *asyncContext) get(timeout time.Duration) (uint64, []float32, []int64, error) {
 	<-ctx.completeC
-	return ctx.distances, ctx.ids, nil
+	return ctx.db, ctx.distances, ctx.ids, nil
 }
 
 func (ctx *asyncContext) reset() {
@@ -93,13 +95,14 @@ func (r *router) addAsyncCtx(ctx *asyncContext, req *rpc.SearchRequest) {
 	r.ctxs.Store(id, ctx)
 }
 
-func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
+func (r *router) search(req *rpc.SearchRequest) (uint64, []float32, []int64, error) {
 	ctx := acquireCtx()
 
 	r.RLock()
 	l := len(req.Xq) / r.dim
 	ctx.to = uint64(len(r.dbs))
 	ctx.completeC = make(chan struct{}, 1)
+	ctx.db = 0
 	ctx.distances = make([]float32, l, l)
 	ctx.ids = make([]int64, l, l)
 	for i := 0; i < l; i++ {
@@ -118,9 +121,9 @@ func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
 	}
 	r.RUnlock()
 
-	ds, ids, err := ctx.get(r.timeout)
+	db, ds, ids, err := ctx.get(r.timeout)
 	releaseCtx(ctx)
-	return ds, ids, err
+	return db, ds, ids, err
 }
 
 func (r *router) onResponse(msg interface{}) {

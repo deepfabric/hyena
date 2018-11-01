@@ -101,7 +101,7 @@ func startG(total int64, wg, complate *sync.WaitGroup, ready chan struct{}, ans 
 
 		s := time.Now()
 		ans.incrSent(*cn)
-		_, _, err := vdb.Search(xq)
+		_, _, _, err := vdb.Search(xq)
 		if err != nil {
 			log.Fatalf("Search failed, %+v", err)
 		}
