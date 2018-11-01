@@ -97,7 +97,7 @@ func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
 	ctx := acquireCtx()
 
 	r.RLock()
-	l := len(req.Xq)
+	l := len(req.Xq) / r.dim
 	ctx.to = uint64(len(r.dbs))
 	ctx.completeC = make(chan struct{}, 1)
 	ctx.distances = make([]float32, l, l)

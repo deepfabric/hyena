@@ -13,6 +13,7 @@ import (
 type router struct {
 	sync.RWMutex
 
+	dim         int
 	watcher     *prophet.Watcher
 	writeableDB *meta.VectorDB
 	stores      map[uint64]*meta.Store
@@ -25,8 +26,9 @@ type router struct {
 	initC       chan struct{}
 }
 
-func newRouter(timeout time.Duration, addrs ...string) *router {
+func newRouter(dim int, timeout time.Duration, addrs ...string) *router {
 	return &router{
+		dim:         dim,
 		watcher:     prophet.NewWatcher(addrs...),
 		writeableDB: nil,
 		stores:      make(map[uint64]*meta.Store),

@@ -8,7 +8,25 @@ import (
 type Option func(*options)
 
 type options struct {
+	dim     int
 	timeout time.Duration
+}
+
+func (opts *options) adjust() {
+	if opts.dim == 0 {
+		opts.dim = 512
+	}
+
+	if opts.timeout == 0 {
+		opts.timeout = time.Millisecond * 200
+	}
+}
+
+// WithDim with dim option
+func WithDim(dim int) Option {
+	return func(opts *options) {
+		opts.dim = dim
+	}
 }
 
 // WithSearchTimeout with timeout option

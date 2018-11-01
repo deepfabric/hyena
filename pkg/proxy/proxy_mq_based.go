@@ -35,6 +35,8 @@ func NewMQBasedProxy(topic string, addrs []string, prophetAddrs []string, opts .
 		opt(p.opts)
 	}
 
+	p.opts.adjust()
+
 	err := p.initProducer()
 	if err != nil {
 		return nil, err
@@ -45,7 +47,7 @@ func NewMQBasedProxy(topic string, addrs []string, prophetAddrs []string, opts .
 }
 
 func (p *mqBasedProxy) initRouter() {
-	p.router = newRouter(p.opts.timeout, p.prophetAddrs...)
+	p.router = newRouter(p.opts.dim, p.opts.timeout, p.prophetAddrs...)
 	go p.router.start()
 	<-p.router.initC
 }
