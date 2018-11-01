@@ -102,6 +102,11 @@ func (r *router) search(req *rpc.SearchRequest) ([]float32, []int64, error) {
 	ctx.completeC = make(chan struct{}, 1)
 	ctx.distances = make([]float32, l, l)
 	ctx.ids = make([]int64, l, l)
+	for i := 0; i < l; i++ {
+		ctx.distances[i] = 0.0
+		ctx.ids[i] = -1
+	}
+
 	for id, db := range r.dbs {
 		bReq := &rpc.SearchRequest{
 			ID: uuid.NewV4().Bytes(),
