@@ -11,6 +11,10 @@ import (
 	"github.com/infinivision/hyena/pkg/util"
 )
 
+const (
+	indexComplete = -1
+)
+
 func (pr *PeerReplicate) maybeStartConsumer(from string) {
 	pr.consumerStartOnce.Do(func() {
 		go func() {

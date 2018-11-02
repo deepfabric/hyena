@@ -42,7 +42,7 @@ func (b *vdbBatch) append(xbs []float32, ids []int64) int64 {
 		b.available -= n
 		b.xbs = append(b.xbs, xbs...)
 		b.ids = append(b.ids, ids...)
-		return -1
+		return indexComplete
 	}
 
 	d := uint64(len(xbs) / len(ids))
