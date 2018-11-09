@@ -69,7 +69,7 @@ func (c *EmbeddedEtcdCfg) getEmbedEtcdConfig() (*embed.Config, error) {
 	return cfg, nil
 }
 
-func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) *clientv3.Client {
+func initWithEmbedEtcd(clientAddrs []string, ecfg *EmbeddedEtcdCfg) *clientv3.Client {
 	log.Info("prophet: start embed etcd")
 	cfg, err := ecfg.getEmbedEtcdConfig()
 	if err != nil {
@@ -86,7 +86,7 @@ func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) *clientv3.Client {
 	select {
 	case <-etcd.Server.ReadyNotify():
 		log.Info("prophet: embed etcd is ready")
-		return doAfterEmbedEtcdServerReady(etcd, cfg, ecfg)
+		return doAfterEmbedEtcdServerReady(clientAddrs, etcd, cfg, ecfg)
 	case <-time.After(time.Minute):
 		log.Fatalf("prophet: start embed etcd timeout")
 	}
@@ -94,7 +94,7 @@ func initWithEmbedEtcd(ecfg *EmbeddedEtcdCfg) *clientv3.Client {
 	return nil
 }
 
-func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *EmbeddedEtcdCfg) *clientv3.Client {
+func doAfterEmbedEtcdServerReady(clientAddrs []string, etcd *embed.Etcd, cfg *embed.Config, ecfg *EmbeddedEtcdCfg) *clientv3.Client {
 	checkEtcdCluster(etcd, ecfg)
 
 	id := uint64(etcd.Server.ID())
@@ -102,7 +102,7 @@ func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *Embe
 		id,
 		etcd.Server.Leader())
 
-	client, err := initEtcdClient(cfg)
+	client, err := initEtcdClient(clientAddrs)
 	if err != nil {
 		log.Fatalf("prophet: init embed etcd client failure, errors:\n %+v",
 			err)
@@ -121,13 +121,11 @@ func doAfterEmbedEtcdServerReady(etcd *embed.Etcd, cfg *embed.Config, ecfg *Embe
 	return client
 }
 
-func initEtcdClient(cfg *embed.Config) (*clientv3.Client, error) {
-	endpoints := []string{cfg.LCUrls[0].String()}
-
-	log.Infof("prophet: create etcd v3 client with endpoints <%v>", endpoints)
+func initEtcdClient(clientAddrs []string) (*clientv3.Client, error) {
+	log.Infof("prophet: create etcd v3 client with endpoints <%v>", clientAddrs)
 
 	client, err := clientv3.New(clientv3.Config{
-		Endpoints:   endpoints,
+		Endpoints:   clientAddrs,
 		DialTimeout: DefaultTimeout,
 	})
 	if err != nil {

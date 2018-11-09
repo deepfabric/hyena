@@ -372,6 +372,7 @@ func (p *Prophet) getLeaderClient() goetty.IOSession {
 
 		conn, err := p.createLeaderClient(addr)
 		if err == nil {
+			log.Infof("prophet: create leader connection to %s", addr)
 			return conn
 		}
 

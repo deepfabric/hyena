@@ -47,6 +47,7 @@ var (
 	// about prophet
 	prophetName                             = flag.String("prophet-name", "node1", "Prophet: name of this node")
 	prophetAddr                             = flag.String("prophet-addr", "127.0.0.1:9529", "Prophet: rpc address")
+	prophetClientAddrs                      = flag.String("prophet-addr-client", "http://127.0.0.1:2371", "Prophet: client urls")
 	prophetNamespace                        = flag.String("prophet-namespace", "/prophet", "Prophet: namespace")
 	prophetURLsClient                       = flag.String("prophet-urls-client", "http://127.0.0.1:2371", "Prophet: embed etcd client urls")
 	prophetURLsAdvertiseClient              = flag.String("prophet-urls-advertise-client", "", "Prophet: embed etcd client advertise urls")
@@ -230,7 +231,7 @@ func parseOptions() []server.Option {
 		embedEtcdCfg.URLsAdvertisePeer = *prophetURLsAdvertisePeer
 		embedEtcdCfg.URLsClient = *prophetURLsClient
 		embedEtcdCfg.URLsPeer = *prophetURLsPeer
-		opts = append(opts, server.WithRaftOption(raftstore.WithProphetOption(prophet.WithEmbeddedEtcd(embedEtcdCfg))))
+		opts = append(opts, server.WithRaftOption(raftstore.WithProphetOption(prophet.WithEmbeddedEtcd(strings.Split(*prophetClientAddrs, ","), embedEtcdCfg))))
 	} else {
 		var endpoints []string
 		if *prophetURLsAdvertiseClient != "" {

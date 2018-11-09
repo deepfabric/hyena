@@ -25,16 +25,21 @@ func (s *Store) startProphet() {
 // BecomeLeader this node is become prophet leader
 func (s *Store) BecomeLeader() {
 	log.Infof("raftstore: BecomeLeader prophet")
-	s.doBootstrapCluster()
-	s.pdStartedC <- struct{}{}
-
+	s.bootOnce.Do(func() {
+		s.doBootstrapCluster()
+		s.pdStartedC <- struct{}{}
+	})
+	log.Infof("raftstore: BecomeLeader prophet complete")
 }
 
 // BecomeFollower this node is become prophet follower
 func (s *Store) BecomeFollower() {
 	log.Infof("raftstore: BecomeFollower prophet")
-	s.doBootstrapCluster()
-	s.pdStartedC <- struct{}{}
+	s.bootOnce.Do(func() {
+		s.doBootstrapCluster()
+		s.pdStartedC <- struct{}{}
+	})
+	log.Infof("raftstore: BecomeFollower prophet complete")
 }
 
 func (s *Store) doBootstrapCluster() {

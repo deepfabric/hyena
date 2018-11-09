@@ -31,9 +31,9 @@ func WithExternalEtcd(client *clientv3.Client) Option {
 }
 
 // WithEmbeddedEtcd using embedded etcd cluster
-func WithEmbeddedEtcd(cfg *EmbeddedEtcdCfg) Option {
+func WithEmbeddedEtcd(clientAddrs []string, cfg *EmbeddedEtcdCfg) Option {
 	return func(opts *options) {
-		opts.client = initWithEmbedEtcd(cfg)
+		opts.client = initWithEmbedEtcd(clientAddrs, cfg)
 		opts.cfg.StorageNode = true
 	}
 }

@@ -30,6 +30,7 @@ func (p *Prophet) startLeaderLoop() {
 				log.Infof("prophet: exit the leader election loop")
 				return
 			default:
+				log.Infof("prophet: ready to fetch leader")
 				leader, err := p.store.GetCurrentLeader()
 				if err != nil {
 					log.Errorf("prophet: get current leader failure, errors:\n %+v",
@@ -37,6 +38,7 @@ func (p *Prophet) startLeaderLoop() {
 					time.Sleep(loopInterval)
 					continue
 				}
+				log.Infof("prophet: fetch leader: %+v", leader)
 
 				if leader != nil {
 					if p.cfg.StorageNode && p.isMatchLeader(leader) {

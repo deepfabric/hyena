@@ -51,6 +51,8 @@ type Store struct {
 
 	firstDBLoaded       uint64
 	rebuildIndexLimiter *rate.Limiter
+
+	bootOnce *sync.Once
 }
 
 // NewStore returns store
@@ -83,6 +85,8 @@ func NewStoreWithCfg(meta meta.Store, cfg *Cfg) *Store {
 	s.pendingSnaps = &sync.Map{}
 	s.delegates = &sync.Map{}
 	s.droppedVoteMsgs = &sync.Map{}
+
+	s.bootOnce = &sync.Once{}
 
 	s.runner = task.NewRunner()
 	for i := 0; i < int(s.cfg.ApplyWorkerCount); i++ {
