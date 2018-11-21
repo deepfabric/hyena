@@ -16,13 +16,13 @@ import (
 )
 
 type reqCtx struct {
-	msgType int32
-	admin   *raftpb.AdminRequest
-	search  *rpc.SearchRequest
-	insert  *rpc.InsertRequest
-	update  *rpc.UpdateRequest
-	cb      func(interface{})
-	cbErr   func([]byte, *raftpb.Error)
+	msgType    int32
+	admin      *raftpb.AdminRequest
+	search     *rpc.SearchRequest
+	insert     *rpc.InsertRequest
+	update     *rpc.UpdateRequest
+	cb         func(interface{})
+	searchNext bool
 }
 
 func (r *reqCtx) reset() {
@@ -31,7 +31,7 @@ func (r *reqCtx) reset() {
 	r.update = nil
 	r.cb = nil
 	r.msgType = -1
-	r.cbErr = nil
+	r.searchNext = false
 }
 
 // PeerReplicate is the db's peer replicate. Every db replicate has a PeerReplicate.
@@ -64,6 +64,8 @@ type PeerReplicate struct {
 	consumer                             *cluster.Consumer
 	condL                                *sync.Mutex
 	cond                                 *sync.Cond
+
+	alreadySplit bool
 }
 
 func createPeerReplicate(store *Store, db *meta.VectorDB) (*PeerReplicate, error) {
@@ -122,6 +124,8 @@ func newPeerReplicate(store *Store, db *meta.VectorDB, peerID uint64) (*PeerRepl
 	pr.mqUpdateRequests = util.New(0)
 	pr.heartbeatsMap = &sync.Map{}
 	pr.batching = newBatching(pr)
+	pr.condL = &sync.Mutex{}
+	pr.cond = sync.NewCond(pr.condL)
 
 	c := store.cfg.getRaftConfig(peerID, ps.appliedIndex(), ps)
 	rn, err := raft.NewRawNode(c, nil)
@@ -305,46 +309,78 @@ func (pr *PeerReplicate) getCurrentTerm() uint64 {
 	return pr.rn.Status().Term
 }
 
-func (pr *PeerReplicate) onAdmin(req *raftpb.AdminRequest) {
+func (pr *PeerReplicate) onAdmin(req *raftpb.AdminRequest) error {
 	r := acquireReqCtx()
 	r.msgType = int32(rpc.MsgAdmin)
 	r.admin = req
-	pr.addRequest(r)
+	return pr.addRequest(r)
 }
 
-func (pr *PeerReplicate) onInsert(req *rpc.InsertRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
+func (pr *PeerReplicate) onAdminWithCB(req *raftpb.AdminRequest, cb func(interface{})) error {
+	r := acquireReqCtx()
+	r.msgType = int32(rpc.MsgAdmin)
+	r.admin = req
+	r.cb = cb
+	err := pr.addRequest(r)
+	if err != nil {
+		cb(err)
+	}
+	return err
+}
+
+func (pr *PeerReplicate) onInsert(req *rpc.InsertRequest, cb func(interface{})) {
 	r := acquireReqCtx()
 	r.msgType = int32(rpc.MsgInsertReq)
 	r.insert = req
 	r.cb = cb
-	r.cbErr = cbErr
 	err := pr.addRequest(r)
-	if err != nil && cbErr != nil {
-		cbErr(req.ID, errorStoreNotMatch())
+	if err != nil && cb != nil {
+		cb(errorStaleCMDResp((req.ID)))
 		util.ReleaseInsertReq(req)
 	}
 }
 
-func (pr *PeerReplicate) onUpdate(req *rpc.UpdateRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
+func (pr *PeerReplicate) onUpdate(req *rpc.UpdateRequest, cb func(interface{})) {
 	r := acquireReqCtx()
 	r.msgType = int32(rpc.MsgUpdateReq)
 	r.update = req
 	r.cb = cb
-	r.cbErr = cbErr
 	err := pr.addRequest(r)
-	if err != nil && cbErr != nil {
-		cbErr(req.ID, errorStoreNotMatch())
+	if err != nil && cb != nil {
+		cb(errorStaleCMDResp(req.ID))
 		util.ReleaseUpdateReq(req)
 	}
 }
 
-func (pr *PeerReplicate) waitInsertCommitted(req *rpc.SearchRequest) {
+func (pr *PeerReplicate) waitInsertCommitted(req *rpc.SearchRequest) bool {
 	if pr.isWritable() {
 		pr.condL.Lock()
-		offset, index := pr.ps.committedOffset()
-		for req.Offset > offset || (req.Offset == offset && index != indexComplete) {
-			pr.cond.Wait()
+		for {
+			offset, index := pr.ps.committedOffset()
+			requestOffsetIsBigger := req.Offset > offset || (req.Offset == offset && index != indexComplete)
+
+			// this db is not writable, if the request offset is bigger than the lastest committed offset,
+			// the client need search the new writable range
+			if pr.ps.availableWriteRecords() <= 0 &&
+				requestOffsetIsBigger {
+				pr.condL.Unlock()
+				return req.Last
+			}
+
+			if requestOffsetIsBigger {
+				pr.cond.Wait()
+			} else {
+				break
+			}
 		}
 		pr.condL.Unlock()
+	} else {
+		offset, index := pr.ps.committedOffset()
+		requestOffsetIsBigger := req.Offset > offset || (req.Offset == offset && index != indexComplete)
+		if requestOffsetIsBigger && req.Last {
+			return true
+		}
 	}
+
+	return false
 }

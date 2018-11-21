@@ -32,6 +32,7 @@ type Cfg struct {
 	MaxPeerDownTime        time.Duration
 	RaftTickDuration       time.Duration
 	RaftLogCompactDuration time.Duration
+	RaftCheckSplitDuration time.Duration
 	SyncWrite              bool
 
 	// about batching

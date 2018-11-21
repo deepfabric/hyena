@@ -33,6 +33,7 @@ type action int
 
 const (
 	checkCompactAction = iota
+	checkSplitAction
 	doCampaignAction
 )
 
@@ -195,7 +196,7 @@ func (pr *PeerReplicate) handleStop() {
 	searches := pr.searches.Dispose()
 	for _, r := range searches {
 		c := r.(*reqCtx)
-		c.cbErr(c.search.ID, errorStoreNotMatch())
+		c.cb(errorStaleCMDResp(c.search.ID))
 		releaseReqCtx(c)
 	}
 
@@ -210,7 +211,7 @@ func (pr *PeerReplicate) handleStop() {
 			break
 		}
 		c := pr.batching.pop()
-		c.respError(errorStoreNotMatch())
+		c.respError(errorStaleCMDResp(nil))
 	}
 }
 
@@ -230,6 +231,8 @@ func (pr *PeerReplicate) handleAction(items []interface{}) {
 		switch a {
 		case checkCompactAction:
 			pr.handleCheckCompact()
+		case checkSplitAction:
+			pr.maybeSplit()
 		case doCampaignAction:
 			_, err := pr.maybeCampaign()
 			if err != nil {
@@ -394,7 +397,7 @@ func (pr *PeerReplicate) handleSearch(items []interface{}) {
 
 	for i := int64(0); i < n; i++ {
 		c := items[i].(*reqCtx)
-		pr.execSearch(c.search, c.cb, c.cbErr)
+		pr.execSearch(c.search, c.cb, c.searchNext)
 		releaseReqCtx(c)
 	}
 
@@ -439,7 +442,7 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 			if req.Offset > from {
 				committedOffset = req.Offset
 				index = vBatch.append(req.Xbs, req.Ids)
-			} else if req.Offset == from && fromIndex != -1 {
+			} else if req.Offset == from && fromIndex != indexComplete {
 				committedOffset = req.Offset
 				index = vBatch.appendFromIndex(req.Xbs, req.Ids, fromIndex)
 			}
@@ -447,8 +450,18 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 
 		util.ReleaseInsertReq(req)
 	}
-	pr.ps.vectorRecords += uint64(len(vBatch.ids))
 
+	// maybe mq client consumer stale message
+	if len(vBatch.ids) == 0 {
+		if pr.requests.Len() > 0 {
+			pr.addEvent()
+		}
+
+		releaseVdbBatch(vBatch)
+		return
+	}
+
+	pr.ps.vectorRecords += uint64(len(vBatch.ids))
 	err = pr.ps.vdb.AddWithIds(vBatch.xbs, vBatch.ids)
 	if err != nil {
 		log.Fatalf("raftstore[db-%d]: batch insert failed, errors:%+v",
@@ -456,7 +469,7 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 			err)
 	}
 
-	log.Debugf("raftstore[db-%d]: after added, %d records on committed offset %d, index %d",
+	log.Debugf("raftstore[db-%d]: after added had %d records, last committed offset %d, index %d",
 		pr.id,
 		pr.ps.vectorRecords,
 		committedOffset,
@@ -537,8 +550,13 @@ func (pr *PeerReplicate) handleReady() {
 			log.Infof("raftstore[db-%d]: ********become leader now********",
 				pr.id)
 			pr.store.pd.GetRPC().TiggerResourceHeartbeat(pr.id)
+			log.Infof("raftstore[db-%d]: resource heartbeat trigger complete",
+				pr.id)
 			pr.resetBatching()
 			pr.maybeSplit()
+		} else {
+			log.Infof("raftstore[db-%d]: ********become follower now********",
+				pr.id)
 		}
 
 		// now we are join in the raft group, bootstrap the mq consumer to process insert requests
@@ -674,32 +692,32 @@ func (pr *PeerReplicate) propose(c *cmd) {
 
 	err := pr.startProposeJob(c, isConfChange)
 	if err != nil {
-		c.resp(errorOtherCMDResp(err))
+		c.respError(errorOtherCMDResp(nil, err))
 	}
 }
 
 func (pr *PeerReplicate) proposeNormal(c *cmd) bool {
 	if !pr.isLeader() {
-		c.respError(errorNotLeader(pr.id, pr.store.getPeer(pr.leaderPeerID())))
+		c.respError(errorNotLeader(nil, pr.id, pr.store.getPeer(pr.leaderPeerID())))
 		return false
 	}
 
 	data := pbutil.MustMarshal(c.req)
 	size := uint64(len(data))
 	if size > pr.store.cfg.MaxRaftEntryBytes {
-		c.respError(errorLargeRaftEntrySize(pr.id, size))
+		c.respError(errorLargeRaftEntrySize(nil, pr.id, size))
 		return false
 	}
 
 	idx := pr.nextProposalIndex()
 	err := pr.rn.Propose(data)
 	if err != nil {
-		c.resp(errorOtherCMDResp(err))
+		c.resp(errorOtherCMDResp(nil, err))
 		return false
 	}
 	idx2 := pr.nextProposalIndex()
 	if idx == idx2 {
-		c.respError(errorNotLeader(pr.id, pr.store.getPeer(pr.leaderPeerID())))
+		c.respError(errorNotLeader(nil, pr.id, pr.store.getPeer(pr.leaderPeerID())))
 		return false
 	}
 
@@ -709,7 +727,7 @@ func (pr *PeerReplicate) proposeNormal(c *cmd) bool {
 func (pr *PeerReplicate) proposeConfChange(c *cmd) bool {
 	err := pr.checkConfChange(c)
 	if err != nil {
-		c.respError(errorOtherCMDResp(err))
+		c.respError(errorOtherCMDResp(nil, err))
 		return false
 	}
 
@@ -721,12 +739,12 @@ func (pr *PeerReplicate) proposeConfChange(c *cmd) bool {
 	idx := pr.nextProposalIndex()
 	err = pr.rn.ProposeConfChange(*cc)
 	if err != nil {
-		c.respError(errorOtherCMDResp(err))
+		c.respError(errorOtherCMDResp(nil, err))
 		return false
 	}
 	idx2 := pr.nextProposalIndex()
 	if idx == idx2 {
-		c.respError(errorNotLeader(pr.id, pr.store.getPeer(pr.leaderPeerID())))
+		c.respError(errorNotLeader(nil, pr.id, pr.store.getPeer(pr.leaderPeerID())))
 		return false
 	}
 
@@ -849,13 +867,13 @@ func (pr *PeerReplicate) isTransferLeaderAllowed(newLeaderPeer meta.Peer) bool {
 func (pr *PeerReplicate) checkProposal(c *cmd) bool {
 	// we handle all read, write and admin cmd here
 	if len(c.req.Header.UUID) == 0 {
-		c.respError(errorOtherCMDResp(errMissingUUIDCMD))
+		c.respError(errorOtherCMDResp(nil, errMissingUUIDCMD))
 		return false
 	}
 
 	err := pr.store.validateStoreID(c.req)
 	if err != nil {
-		c.respError(errorOtherCMDResp(err))
+		c.respError(errorOtherCMDResp(nil, err))
 		return false
 	}
 
@@ -1131,8 +1149,6 @@ func (pr *PeerReplicate) doPollApply(result *asyncApplyResult) {
 	if result.result != nil {
 		pr.store.doPostApplyResult(result)
 	}
-
-	pr.maybeSplit()
 }
 
 func (pr *PeerReplicate) doPostApply(result *asyncApplyResult) {
@@ -1141,8 +1157,8 @@ func (pr *PeerReplicate) doPostApply(result *asyncApplyResult) {
 			pr.id)
 	}
 
+	pr.ps.setRaftApplyState(result.applyState)
 	pr.ps.vectorRecords += result.writtenRecords
-	pr.ps.raftApplyState = result.applyState
 	pr.ps.appliedIndexTerm = result.appliedIndexTerm
 	pr.rn.AdvanceApply(result.applyState.AppliedIndex)
 
@@ -1152,11 +1168,13 @@ func (pr *PeerReplicate) doPostApply(result *asyncApplyResult) {
 }
 
 func (pr *PeerReplicate) maybeSplit() {
-	if pr.ps.vectorRecords >= pr.store.cfg.MaxDBRecords {
+	if pr.ps.availableWriteRecords() <= 0 {
 		pr.maybeStopConsumer()
 
-		if pr.isLeader() && !pr.ps.inAsking && pr.isWritable() {
+		if pr.isLeader() && !pr.alreadySplit && pr.isWritable() {
+			pr.alreadySplit = true
 			offset, index := pr.ps.committedOffset()
+
 			log.Infof("raftstore[db-%d]: %d reach the maximum limit %d per db, split at committed offset %d, index %d, %+v",
 				pr.id,
 				pr.ps.vectorRecords,
@@ -1164,14 +1182,11 @@ func (pr *PeerReplicate) maybeSplit() {
 				offset,
 				index,
 				pr.ps.db)
-			pr.ps.inAsking = true
 
-			err := pr.startAskSplitJob(pr.ps.db, offset, index)
-			if err != nil {
-				log.Fatalf("raftstore[db-%d]: add ask split job failed, errors: %+v",
-					pr.id,
-					err)
-			}
+			// notify wait search, maybe choose next range db
+			pr.cond.Broadcast()
+
+			pr.startAskSplitJob(pr.ps.db, offset, index)
 		}
 	}
 }
@@ -1269,10 +1284,9 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 			id)
 	}
 
-	pr.ps.inAsking = false
-
+	pr.alreadySplit = true
 	if !result.valid {
-		pr.maybeSplit()
+		pr.alreadySplit = false
 		return
 	}
 

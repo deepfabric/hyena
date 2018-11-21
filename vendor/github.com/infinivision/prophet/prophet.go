@@ -19,8 +19,8 @@ type Adapter interface {
 	NewResource() Resource
 	// NewContainer return a new container
 	NewContainer() Container
-	// FetchResourceHB fetch resource HB
-	FetchAllResourceHB() []*ResourceHeartbeatReq
+	// FetchLeaderResources fetch loacle leader resource
+	FetchLeaderResources() []uint64
 	// FetchResourceHB fetch resource HB
 	FetchResourceHB(id uint64) *ResourceHeartbeatReq
 	// FetchContainerHB fetch container HB
@@ -51,7 +51,8 @@ type Prophet struct {
 	rpc         *simpleRPC
 	bizCodec    *codec
 
-	wn *watcherNotifier
+	wn          *watcherNotifier
+	resourceHBC chan uint64
 }
 
 // NewProphet returns a prophet instance
@@ -80,6 +81,7 @@ func NewProphet(name string, addr string, adapter Adapter, opts ...Option) *Prop
 		goetty.WithServerEncoder(goetty.NewIntLengthFieldBasedEncoder(p.bizCodec)))
 	p.completeC = make(chan struct{})
 	p.rpc = newSimpleRPC(p)
+	p.resourceHBC = make(chan uint64, 512)
 
 	return p
 }

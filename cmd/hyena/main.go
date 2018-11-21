@@ -33,9 +33,8 @@ import (
 )
 
 const (
-	kb      = 1024
-	mb      = 1024 * kb
-	million = 1000000
+	kb = 1024
+	mb = 1024 * kb
 )
 
 var (
@@ -89,9 +88,10 @@ var (
 	maxRaftLogBytesMB         = flag.Uint64("raft-max-log-bytes", 32, "Raft(MB): total bytes of raft logs, if reach this limit, leader will compact [first,applied], otherwise [first, minimum replicated]")
 	maxRaftLogLag             = flag.Uint64("raft-max-lag", 0, "Raft: max count of lag log, leader will compact [first, compact - lag], avoid send snapshot file to a little lag peer")
 	raftLogCompactDurationSec = flag.Int("raft-compact", 10, "Raft(sec): compact raft log")
+	raftCheckSplitDurationSec = flag.Int("raft-split", 1, "Raft(sec): raft check split")
 	syncWrite                 = flag.Bool("raft-sync", false, "Raft: sync to disk while append the raft log")
 	maxBatchingSize           = flag.Int("raft-batch-proposal", 1024, "Raft: max commands in a proposal.")
-	maxDBRecordsMillion       = flag.Uint64("raft-db-capacity", 1, "Raft(Million): max records per vectordb ")
+	maxDBRecords              = flag.Uint64("raft-db-capacity", 1000000, "Raft: max records per vectordb ")
 	sentRaftWorkerCount       = flag.Uint64("raft-worker-raft", 8, "Raft: workers for sent raft messages")
 	sentSnapWorkerCount       = flag.Uint64("raft-worker-snap", 4, "Raft: workers for sent snap messages")
 	applyWorkerCount          = flag.Uint64("raft-worker-apply", 1, "Raft: workers for apply raft log")
@@ -273,9 +273,10 @@ func parseOptions() []server.Option {
 	opts = append(opts, server.WithRaftOption(raftstore.WithMaxRaftLogBytes(*maxRaftLogBytesMB*mb)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithMaxRaftLogLag(*maxRaftLogLag)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithRaftLogCompactDuration(time.Second*time.Duration(*raftLogCompactDurationSec))))
+	opts = append(opts, server.WithRaftOption(raftstore.WithRaftCheckSplitDuration(time.Second*time.Duration(*raftCheckSplitDurationSec))))
 	opts = append(opts, server.WithRaftOption(raftstore.WithSyncWrite(*syncWrite)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithMaxBatchingSize(*maxBatchingSize)))
-	opts = append(opts, server.WithRaftOption(raftstore.WithMaxDBRecords(*maxDBRecordsMillion*million)))
+	opts = append(opts, server.WithRaftOption(raftstore.WithMaxDBRecords(*maxDBRecords)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithSentRaftWorkerCount(*sentRaftWorkerCount)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithSentSnapWorkerCount(*sentSnapWorkerCount)))
 	opts = append(opts, server.WithRaftOption(raftstore.WithApplyWorkerCount(*applyWorkerCount)))

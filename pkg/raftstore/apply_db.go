@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/fagongzi/log"
-	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
 	"github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 )
@@ -76,8 +75,8 @@ func (b *vdbBatch) appendable() bool {
 func (b *vdbBatch) reset() {
 	b.available = 0
 	b.doF = nil
-	b.xbs = b.xbs[:0]
-	b.ids = b.ids[:0]
+	b.xbs = nil
+	b.ids = nil
 }
 
 func (d *applyDelegate) execWriteRequest(ctx *applyContext) {
@@ -114,14 +113,14 @@ func (d *applyDelegate) execUpdate(ctx *applyContext, req *rpc.UpdateRequest) {
 	ctx.resps = append(ctx.resps, rsp)
 }
 
-func (pr *PeerReplicate) execSearch(req *rpc.SearchRequest, cb func(interface{}), cbErr func([]byte, *raftpb.Error)) {
+func (pr *PeerReplicate) execSearch(req *rpc.SearchRequest, cb func(interface{}), searchNext bool) {
 	n := len(req.Xq) / pr.store.cfg.Dim
 	ds := make([]float32, n, n)
 	ids := make([]int64, n, n)
 
 	_, err := pr.ps.vdb.Search(req.Xq, ds, ids)
 	if err != nil {
-		cbErr(req.ID, errorOtherCMDResp(err))
+		cb(errorOtherCMDResp(req.ID, err))
 		return
 	}
 
@@ -130,6 +129,7 @@ func (pr *PeerReplicate) execSearch(req *rpc.SearchRequest, cb func(interface{})
 	rsp.Distances = ds
 	rsp.Xids = ids
 	rsp.DB = pr.id
+	rsp.SearchNext = searchNext
 	cb(rsp)
 }
 

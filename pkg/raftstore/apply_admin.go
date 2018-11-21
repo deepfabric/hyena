@@ -111,9 +111,11 @@ func (d *applyDelegate) doExecSplit(ctx *applyContext) (*execResult, error) {
 		return result, nil
 	}
 
-	log.Infof("raftstore[db-%d]: exec split, db=<%+v>",
+	log.Infof("raftstore[db-%d]: exec split, db=<%+v>, term %d, index %d",
 		d.db.ID,
-		d.db)
+		d.db,
+		ctx.term,
+		ctx.index)
 
 	newDB := meta.VectorDB{
 		ID:    req.NewID,

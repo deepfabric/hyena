@@ -2,7 +2,6 @@ package raftstore
 
 import (
 	"fmt"
-	"sync"
 
 	cluster "github.com/bsm/sarama-cluster"
 	"github.com/fagongzi/log"
@@ -29,7 +28,6 @@ func (pr *PeerReplicate) maybeStartConsumer(from string) {
 					pr.id,
 					err)
 			}
-
 			c, err := cluster.NewConsumer(pr.store.cfg.MQAddrs, fmt.Sprintf("%s-%d", pr.store.cfg.GroupPrefix, pr.peer.ID), []string{pr.store.cfg.Topic}, config)
 			if err != nil {
 				log.Fatal(err)
@@ -37,13 +35,13 @@ func (pr *PeerReplicate) maybeStartConsumer(from string) {
 			}
 
 			pr.consumer = c
-			pr.condL = &sync.Mutex{}
-			pr.cond = sync.NewCond(pr.condL)
 			pr.doStartConsumerLoops(config.Consumer.Offsets.Initial)
 			log.Infof("raftstore[db-%d]: ********start mq consumer by %s with offset %d********",
 				pr.id,
 				from,
 				config.Consumer.Offsets.Initial)
+
+			pr.cond.Broadcast()
 		}()
 	})
 }
@@ -69,7 +67,7 @@ func (pr *PeerReplicate) doStartConsumerLoops(offset int64) {
 		for {
 			err, ok := <-pr.consumer.Errors()
 			if !ok {
-				log.Errorf("raftstore[db-%d]: mq consumer error loop exit",
+				log.Infof("raftstore[db-%d]: mq consumer error loop exit",
 					pr.id)
 				return
 			}
@@ -96,18 +94,21 @@ func (pr *PeerReplicate) doStartConsumerLoops(offset int64) {
 	}()
 
 	go func() {
+		buf := acquireBuf(pr.store.cfg.Dim*4 + 256)
+		defer releaseBuf(buf)
+
 		for {
 			message, ok := <-pr.consumer.Messages()
 			if !ok {
-				log.Warnf("raftstore[db-%d]: mq consumer read loop exit",
+				log.Infof("raftstore[db-%d]: mq consumer read loop exit",
 					pr.id)
 				return
 			}
 
 			if offset <= message.Offset {
-				buf := acquireBuf(len(message.Value))
 				buf.Write(message.Value)
 				_, msg, err := bizCodc.GetDecoder().Decode(buf)
+				buf.Clear()
 				if err != nil {
 					log.Fatalf("bug: decode from nsq failed, errors:\n%+v",
 						err)

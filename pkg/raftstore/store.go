@@ -14,6 +14,7 @@ import (
 	"github.com/fagongzi/util/task"
 	"github.com/infinivision/hyena/pkg/pb/meta"
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
+	rpcpb "github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 	"github.com/infinivision/prophet"
 	"golang.org/x/time/rate"
@@ -116,6 +117,9 @@ func (s *Store) Start() {
 
 	s.startRaftCompact()
 	log.Infof("raftstore: ready to handle raft log task")
+
+	s.startCheckSplit()
+	log.Infof("raftstore: ready to handle raft split check task")
 }
 
 // Stop returns the error when stop store
@@ -229,6 +233,30 @@ func (s *Store) startRaftCompact() {
 					pr := value.(*PeerReplicate)
 					if pr.isLeader() {
 						pr.addAction(checkCompactAction)
+					}
+
+					return true
+				})
+			}
+		}
+	})
+}
+
+func (s *Store) startCheckSplit() {
+	s.runner.RunCancelableTask(func(ctx context.Context) {
+		ticker := time.NewTicker(s.cfg.RaftCheckSplitDuration)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				log.Infof("raftstore: raft check split job stopped")
+				return
+			case <-ticker.C:
+				s.replicates.Range(func(key, value interface{}) bool {
+					pr := value.(*PeerReplicate)
+					if pr.isLeader() && pr.isWritable() {
+						pr.addAction(checkSplitAction)
 					}
 
 					return true
@@ -419,7 +447,7 @@ func (s *Store) tryToCreatePeerReplicate(id uint64, msg *raftpb.RaftMessage) boo
 
 	// check range overlapped
 	// if we have the writeable db, and has overlapped with new db, we cann't create the replicate
-	pr := s.getWriteableDB(false)
+	pr := s.getWritableDB(false)
 	if pr != nil &&
 		pr.id < msg.ID && // if the new db'id is small then the writeable db, cant't be overlap
 		pr.ps.db.Start+s.cfg.MaxDBRecords <= msg.Start {
@@ -650,7 +678,7 @@ func (s *Store) addPeerToCache(peer meta.Peer) {
 	s.peers.Store(peer.ID, &peer)
 }
 
-func (s *Store) getWriteableDB(leader bool) *PeerReplicate {
+func (s *Store) getWritableDB(leader bool) *PeerReplicate {
 	var pr *PeerReplicate
 	s.replicates.Range(func(key, value interface{}) bool {
 		p := value.(*PeerReplicate)
@@ -722,36 +750,36 @@ func (s *Store) validateStoreID(req *raftpb.RaftCMDRequest) error {
 	return nil
 }
 
-func (s *Store) validateDB(req *raftpb.RaftCMDRequest) *raftpb.Error {
+func (s *Store) validateDB(req *raftpb.RaftCMDRequest) *rpcpb.ErrResponse {
 	dbID := req.Header.ID
 	peerID := req.Header.Peer.ID
 
 	pr := s.getDB(dbID, false)
 	if nil == pr {
-		return errorDBNotFound(dbID)
+		return errorDBNotFound(nil, dbID)
 	}
 
 	if !pr.isLeader() {
-		return errorNotLeader(dbID, s.getPeer(pr.leaderPeerID()))
+		return errorNotLeader(nil, dbID, s.getPeer(pr.leaderPeerID()))
 	}
 
 	if pr.peer.ID != peerID {
-		return errorOtherCMDResp(fmt.Errorf("mismatch peer id, give=<%d> want=<%d>", peerID, pr.peer.ID))
+		return errorOtherCMDResp(nil, fmt.Errorf("mismatch peer id, give=<%d> want=<%d>", peerID, pr.peer.ID))
 	}
 
 	// If header's term is 2 verions behind current term,
 	// leadership may have been changed away.
 	if req.Header.Term > 0 && pr.getCurrentTerm() > req.Header.Term+1 {
-		return errorStaleCMDResp()
+		return errorStaleCMDResp(nil)
 	}
 
 	if !checkEpoch(pr.ps.db, req) {
-		wp := s.getWriteableDB(true)
+		wp := s.getWritableDB(true)
 		if wp != nil {
-			return errorStaleEpochResp(wp.ps.db)
+			return errorStaleEpochResp(nil, wp.ps.db)
 		}
 
-		return errorStaleEpochResp()
+		return errorStaleEpochResp(nil)
 	}
 
 	return nil

@@ -99,39 +99,7 @@ func (rpc *simpleRPC) AskSplit(res Resource) (uint64, []uint64, error) {
 }
 
 func (rpc *simpleRPC) TiggerResourceHeartbeat(id uint64) {
-	conn, err := rpc.acquireConn()
-	if err != nil {
-		return
-	}
-
-	for {
-		hb := rpc.prophet.adapter.FetchResourceHB(id)
-		if hb == nil {
-			return
-		}
-
-		err = conn.c.WriteAndFlush(hb)
-		if err != nil {
-			rpc.closeConn(conn)
-			return
-		}
-
-		value, err := conn.c.ReadTimeout(rpc.maxTimeout)
-		if err != nil {
-			rpc.closeConn(conn)
-			return
-		}
-
-		if rsp, ok := value.(*resourceHeartbeatRsp); ok {
-			if rsp.NewLeader != nil {
-				rpc.prophet.adapter.HBHandler().ChangeLeader(rsp.ResourceID, rsp.NewLeader)
-			} else if rsp.Peer != nil {
-				rpc.prophet.adapter.HBHandler().ChangePeer(rsp.ResourceID, rsp.Peer, rsp.ChangeType)
-			}
-			rpc.releaseConn(conn)
-			return
-		}
-	}
+	rpc.prophet.resourceHBC <- id
 }
 
 func (rpc *simpleRPC) TiggerContainerHeartbeat() {
@@ -211,9 +179,7 @@ func (rpc *simpleRPC) acquireConn() (*clientConn, error) {
 }
 
 func (rpc *simpleRPC) decConnsCount() {
-	rpc.Lock()
 	rpc.connsCount--
-	rpc.Unlock()
 }
 
 func (rpc *simpleRPC) releaseConn(cc *clientConn) {

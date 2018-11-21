@@ -11,6 +11,7 @@ import (
 	pbutil "github.com/fagongzi/util/protoc"
 	"github.com/infinivision/hyena/pkg/pb/meta"
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
+	rpcpb "github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 )
 
@@ -279,19 +280,19 @@ func (d *applyDelegate) doApplyRaftCMD(ctx *applyContext) *execResult {
 	}
 
 	var err error
-	var errRsp *raftpb.Error
+	var errRsp *rpcpb.ErrResponse
 	var result *execResult
 
 	ctx.wb = d.store.metaStore.NewWriteBatch()
 	ctx.vdbBatch = acquireVdbBatch()
 
 	if !checkEpoch(d.db, ctx.req) {
-		errRsp = errorStaleEpochResp(d.db)
+		errRsp = errorStaleEpochResp(nil, d.db)
 	} else {
 		if ctx.req.Admin != nil {
 			result, err = d.execAdminRequest(ctx)
 			if err != nil {
-				errRsp = errorStaleEpochResp(d.db)
+				errRsp = errorStaleEpochResp(nil, d.db)
 			}
 		} else {
 			d.execWriteRequest(ctx)
@@ -405,7 +406,7 @@ func (d *applyDelegate) notifyStaleCMD(c *cmd) {
 		d.db.ID,
 		c,
 		d.term)
-	c.respError(errorStaleCMDResp())
+	c.respError(errorStaleCMDResp(nil))
 }
 
 func (d *applyDelegate) notifyDBRemoved(c *cmd) {

@@ -4,20 +4,19 @@ import (
 	"github.com/fagongzi/log"
 	"github.com/fagongzi/util/uuid"
 	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
+	rpcpb "github.com/infinivision/hyena/pkg/pb/rpc"
 	"github.com/infinivision/hyena/pkg/util"
 )
 
 type cmd struct {
-	req   *raftpb.RaftCMDRequest
-	cb    func(interface{})
-	cbErr func([]byte, *raftpb.Error)
-	term  uint64
+	req  *raftpb.RaftCMDRequest
+	cb   func(interface{})
+	term uint64
 }
 
 func newCMD(req *reqCtx, pr *PeerReplicate) *cmd {
 	c := acquireCmd()
 	c.cb = req.cb
-	c.cbErr = req.cbErr
 	c.req = util.AcquireRaftCMDRequest()
 	c.req.Admin = req.admin
 	c.req.Header.ID = pr.id
@@ -45,8 +44,8 @@ func (c *cmd) reset() {
 	c.term = 0
 }
 
-func (c *cmd) respError(err *raftpb.Error) {
-	if c.cbErr == nil {
+func (c *cmd) respError(err *rpcpb.ErrResponse) {
+	if c.cb == nil {
 		return
 	}
 
@@ -55,20 +54,26 @@ func (c *cmd) respError(err *raftpb.Error) {
 		err)
 
 	for _, req := range c.req.Inserts {
-		c.cbErr(req.ID, err)
+		c.cb(copyWithID(req.ID, err))
 	}
 
 	for _, req := range c.req.Updates {
-		c.cbErr(req.ID, err)
+		c.cb(copyWithID(req.ID, err))
 	}
+
+	if c.req.Admin != nil {
+		c.cb(err)
+	}
+
+	c.release()
 }
 
 func (c *cmd) respDBNotFound(id uint64) {
-	c.respError(errorDBNotFound(id))
+	c.respError(errorDBNotFound(nil, id))
 }
 
 func (c *cmd) resp(resps ...interface{}) {
-	if c.cb != nil {
+	if c.cb != nil && c.req.Admin == nil {
 		log.Debugf("raftstore[db-%d]: response to client",
 			c.req.Header.ID)
 

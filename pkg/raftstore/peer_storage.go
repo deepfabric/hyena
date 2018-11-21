@@ -51,7 +51,6 @@ type peerStorage struct {
 
 	commitedOffsetAtSplit uint64
 	vectorRecords         uint64
-	inAsking              bool
 }
 
 func newPeerStorage(store *Store, db meta.VectorDB) (*peerStorage, error) {
@@ -366,6 +365,11 @@ func (ps *peerStorage) clearData() error {
 
 func (ps *peerStorage) isInitialized() bool {
 	return len(ps.db.Peers) != 0
+}
+
+func (ps *peerStorage) setRaftApplyState(newState raftpb.RaftApplyState) {
+	ps.raftApplyState.AppliedIndex = newState.AppliedIndex
+	ps.raftApplyState.TruncatedState = newState.TruncatedState
 }
 
 func (ps *peerStorage) committedIndex() uint64 {

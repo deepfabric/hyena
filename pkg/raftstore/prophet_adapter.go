@@ -37,19 +37,15 @@ func (pa *ProphetAdapter) FetchResourceHB(id uint64) *prophet.ResourceHeartbeatR
 	return getResourceHB(pr)
 }
 
-// FetchAllResourceHB fetch all resource HB
-func (pa *ProphetAdapter) FetchAllResourceHB() []*prophet.ResourceHeartbeatReq {
-	var values []*prophet.ResourceHeartbeatReq
+// FetchLeaderResources fetch all local leader resources
+func (pa *ProphetAdapter) FetchLeaderResources() []uint64 {
+	var values []uint64
 	pa.store.replicates.Range(func(key, value interface{}) bool {
 		pr := value.(*PeerReplicate)
 		pr.checkPeers()
 
 		if pr.isLeader() {
-			hb := getResourceHB(pr)
-			if hb != nil {
-				values = append(values, hb)
-			}
-
+			values = append(values, pr.id)
 		}
 
 		return true

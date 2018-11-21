@@ -49,6 +49,7 @@ func NewMQBasedProxy(topic string, addrs []string, prophetAddrs []string, opts .
 func (p *mqBasedProxy) initRouter() {
 	p.router = newRouter(p.opts.dim, p.opts.timeout, p.prophetAddrs...)
 	go p.router.start()
+	go p.router.startWaitSent()
 	<-p.router.initC
 }
 

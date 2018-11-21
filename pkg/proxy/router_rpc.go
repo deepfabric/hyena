@@ -1,12 +1,12 @@
 package proxy
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/fagongzi/goetty"
-	"github.com/fagongzi/log"
 	"github.com/fagongzi/util/hack"
 	"github.com/fagongzi/util/uuid"
 	"github.com/infinivision/hyena/pkg/pb/meta"
@@ -14,9 +14,14 @@ import (
 	"github.com/infinivision/hyena/pkg/util"
 )
 
+var (
+	// ErrTimeout timeout
+	ErrTimeout = errors.New("timeout")
+)
+
 type asyncContext struct {
 	sync.Mutex
-	timeouts     sync.Map
+	wait         uint64
 	completeC    chan struct{}
 	to, received uint64
 	db           uint64
@@ -24,83 +29,64 @@ type asyncContext struct {
 	ids          []int64
 }
 
-func (ctx *asyncContext) addTimeout(id interface{}, timeout time.Duration) {
-	t, err := util.DefaultTimeoutWheel().Schedule(timeout, ctx.onTimeout, id)
-	if err != nil {
-		log.Fatal("bug: timeout can not added failed")
-	}
-	ctx.timeouts.Store(id, &t)
-}
-
 func (ctx *asyncContext) done(id interface{}, rsp *rpc.SearchResponse) {
-	if value, ok := ctx.timeouts.Load(id); ok {
-		ctx.timeouts.Delete(id)
-		value.(*goetty.Timeout).Stop()
-		if nil != rsp {
-			ctx.Lock()
-			for idx, value := range rsp.Xids {
-				if value != -1 && betterThan(rsp.Distances[idx], ctx.distances[idx]) {
-					ctx.distances[idx] = rsp.Distances[idx]
-					ctx.ids[idx] = value
-					ctx.db = rsp.DB
-				}
+	if nil != rsp {
+		ctx.Lock()
+		for idx, value := range rsp.Xids {
+			if value != -1 && betterThan(rsp.Distances[idx], ctx.distances[idx]) {
+				ctx.distances[idx] = rsp.Distances[idx]
+				ctx.ids[idx] = value
+				ctx.db = rsp.DB
 			}
-			ctx.Unlock()
 		}
+		ctx.Unlock()
 	}
 
 	newV := atomic.AddUint64(&ctx.received, 1)
-	if newV == ctx.to {
+	if newV == atomic.LoadUint64(&ctx.to) && 0 == atomic.LoadUint64(&ctx.wait) {
 		ctx.completeC <- struct{}{}
 	}
 }
 
-func (ctx *asyncContext) onTimeout(id interface{}) {
-	if _, ok := ctx.timeouts.Load(id); ok {
-		ctx.done(id, nil)
-	}
-}
-
 func (ctx *asyncContext) get(timeout time.Duration) (uint64, []float32, []int64, error) {
-	<-ctx.completeC
-	return ctx.db, ctx.distances, ctx.ids, nil
+	timeoutCtx, cancel := context.WithTimeout(context.TODO(), timeout)
+
+	select {
+	case <-ctx.completeC:
+		cancel()
+		return ctx.db, ctx.distances, ctx.ids, nil
+	case <-timeoutCtx.Done():
+		cancel()
+		return ctx.db, ctx.distances, ctx.ids, ErrTimeout
+	}
 }
 
 func (ctx *asyncContext) reset() {
 	// reset counter
+	ctx.wait = 0
 	ctx.to = 0
 	ctx.received = 0
-
-	// clear map
-	ctx.timeouts.Range(func(key, value interface{}) bool {
-		value.(*goetty.Timeout).Stop()
-		ctx.timeouts.Delete(key)
-		return true
-	})
-
 	// clear chan
-	for {
-		select {
-		case <-ctx.completeC:
-		default:
-			close(ctx.completeC)
-			return
-		}
-	}
+	close(ctx.completeC)
 }
 
 func (r *router) addAsyncCtx(ctx *asyncContext, req *rpc.SearchRequest) {
 	id := key(req.ID)
-	ctx.addTimeout(id, r.timeout)
 	r.ctxs.Store(id, ctx)
+	r.ctxs.Store(id, req)
+
+	util.DefaultTimeoutWheel().Schedule(r.timeout, r.cleanTimeout, id)
+}
+
+func (r *router) cleanTimeout(id interface{}) {
+	r.ctxs.Delete(id)
+	r.requests.Delete(id)
 }
 
 func (r *router) search(req *rpc.SearchRequest) (uint64, []float32, []int64, error) {
 	ctx := acquireCtx()
 
-	r.RLock()
 	l := len(req.Xq) / r.dim
-	ctx.to = uint64(len(r.dbs))
 	ctx.completeC = make(chan struct{}, 1)
 	ctx.db = 0
 	ctx.distances = make([]float32, l, l)
@@ -110,16 +96,17 @@ func (r *router) search(req *rpc.SearchRequest) (uint64, []float32, []int64, err
 		ctx.ids[i] = -1
 	}
 
-	for id, db := range r.dbs {
+	r.foreach(func(db *meta.VectorDB, max bool) {
+		ctx.to++
 		bReq := &rpc.SearchRequest{
-			ID: uuid.NewV4().Bytes(),
-			DB: id,
-			Xq: req.Xq,
+			ID:   uuid.NewV4().Bytes(),
+			DB:   db.ID,
+			Xq:   req.Xq,
+			Last: max,
 		}
 		r.addAsyncCtx(ctx, bReq)
-		r.transports[r.selectTargetPeer(db).StoreID].sent(bReq)
-	}
-	r.RUnlock()
+		r.send(db, bReq)
+	})
 
 	db, ds, ids, err := ctx.get(r.timeout)
 	releaseCtx(ctx)
@@ -129,17 +116,41 @@ func (r *router) search(req *rpc.SearchRequest) (uint64, []float32, []int64, err
 func (r *router) onResponse(msg interface{}) {
 	if rsp, ok := msg.(*rpc.SearchResponse); ok {
 		id := key(rsp.ID)
-		value, ok := r.ctxs.Load(id)
-		if ok {
+		if value, ok := r.ctxs.Load(id); ok {
 			r.ctxs.Delete(id)
-			value.(*asyncContext).done(id, rsp)
+			ctx := value.(*asyncContext)
+			if rsp.SearchNext {
+				r.sendWaitReq(id, ctx)
+			}
+
+			ctx.done(id, rsp)
 		}
 	} else if rsp, ok := msg.(*rpc.ErrResponse); ok {
+		// choose next retry if err
 		id := key(rsp.ID)
-		value, ok := r.ctxs.Load(id)
-		if ok {
-			r.ctxs.Delete(id)
-			value.(*asyncContext).done(id, nil)
+		if req, ok := r.requests.Load(id); ok {
+			r.do(req.(*rpc.SearchRequest).DB, func(db *meta.VectorDB) {
+				r.send(db, req.(*rpc.SearchRequest))
+			})
+		}
+	}
+}
+
+func (r *router) send(db *meta.VectorDB, req *rpc.SearchRequest) {
+	r.transports[r.selectTargetPeer(db).StoreID].sent(req)
+}
+
+func (r *router) sendWaitReq(id interface{}, ctx *asyncContext) {
+	atomic.StoreUint64(&ctx.wait, 1)
+	if req, ok := r.requests.Load(id); ok {
+		r.waitC <- &waitReq{
+			oldReq: req.(*rpc.SearchRequest),
+			before: func(newReq *rpc.SearchRequest) {
+				atomic.AddUint64(&ctx.to, 1)
+			},
+			after: func() {
+				atomic.StoreUint64(&ctx.wait, 0)
+			},
 		}
 	}
 }

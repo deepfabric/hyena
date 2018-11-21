@@ -14,6 +14,8 @@ type HeartbeatHandler interface {
 }
 
 func (p *Prophet) startResourceHeartbeatLoop() {
+	p.doResourceHeartbeatLoop()
+
 	p.runner.RunCancelableTask(func(ctx context.Context) {
 		ticker := time.NewTicker(p.adapter.ResourceHBInterval())
 		defer ticker.Stop()
@@ -27,45 +29,62 @@ func (p *Prophet) startResourceHeartbeatLoop() {
 				}
 				return
 			case <-ticker.C:
+				ids := p.adapter.FetchLeaderResources()
+				for _, id := range ids {
+					p.resourceHBC <- id
+				}
+			}
+		}
+	})
+}
+
+func (p *Prophet) doResourceHeartbeatLoop() {
+	p.runner.RunCancelableTask(func(ctx context.Context) {
+		var conn goetty.IOSession
+		for {
+			select {
+			case <-ctx.Done():
+				if nil != conn {
+					conn.Close()
+				}
+				return
+			case id := <-p.resourceHBC:
 				if conn == nil {
 					conn = p.getLeaderClient()
 				}
 
-				hbs := p.adapter.FetchAllResourceHB()
-				var err error
-				for _, hb := range hbs {
-					if hb == nil {
-						continue
-					}
+				hb := p.adapter.FetchResourceHB(id)
+				if hb == nil {
+					break
+				}
 
-					err = conn.WriteAndFlush(hb)
-					if err != nil {
-						conn.Close()
-						conn = nil
-						log.Errorf("prophet: send resource heartbeat failed, errors: %+v", err)
-						break
-					}
+				err := conn.WriteAndFlush(hb)
+				if err != nil {
+					conn.Close()
+					conn = nil
+					log.Errorf("prophet: send resource heartbeat failed, errors: %+v", err)
+					break
+				}
 
-					// read rsp
-					msg, err := conn.ReadTimeout(p.cfg.MaxRPCTimeout)
-					if err != nil {
-						conn.Close()
-						conn = nil
-						log.Errorf("prophet: read heartbeat rsp failed, errors: %+v", err)
-						break
-					}
+				// read rsp
+				msg, err := conn.ReadTimeout(p.cfg.MaxRPCTimeout)
+				if err != nil {
+					conn.Close()
+					conn = nil
+					log.Errorf("prophet: read heartbeat rsp failed, errors: %+v", err)
+					break
+				}
 
-					if rsp, ok := msg.(*errorRsp); ok {
-						conn.Close()
-						conn = nil
-						log.Infof("prophet: read heartbeat rsp with error %s", rsp.Err)
-						break
-					} else if rsp, ok := msg.(*resourceHeartbeatRsp); ok {
-						if rsp.NewLeader != nil {
-							p.adapter.HBHandler().ChangeLeader(rsp.ResourceID, rsp.NewLeader)
-						} else if rsp.Peer != nil {
-							p.adapter.HBHandler().ChangePeer(rsp.ResourceID, rsp.Peer, rsp.ChangeType)
-						}
+				if rsp, ok := msg.(*errorRsp); ok {
+					conn.Close()
+					conn = nil
+					log.Infof("prophet: read heartbeat rsp with error %s", rsp.Err)
+					break
+				} else if rsp, ok := msg.(*resourceHeartbeatRsp); ok {
+					if rsp.NewLeader != nil {
+						p.adapter.HBHandler().ChangeLeader(rsp.ResourceID, rsp.NewLeader)
+					} else if rsp.Peer != nil {
+						p.adapter.HBHandler().ChangePeer(rsp.ResourceID, rsp.Peer, rsp.ChangeType)
 					}
 				}
 			}
@@ -116,7 +135,7 @@ func (p *Prophet) startContainerHeartbeatLoop() {
 				if rsp, ok := msg.(*errorRsp); ok {
 					conn.Close()
 					conn = nil
-					log.Infof("prophet: read heartbeat rsp with error %s", rsp.Err)
+					log.Infof("prophet: read container rsp with error %s", rsp.Err)
 				}
 			}
 		}

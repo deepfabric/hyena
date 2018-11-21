@@ -257,6 +257,7 @@ func (wn *watcherNotifier) stop() {
 	wn.eventC = nil
 	wn.watchers.Range(func(key, value interface{}) bool {
 		wn.watchers.Delete(key)
+		value.(*watcher).conn.Close()
 		return true
 	})
 	wn.Unlock()

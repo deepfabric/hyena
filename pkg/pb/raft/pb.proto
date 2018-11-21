@@ -165,38 +165,3 @@ message CompactLogRequest {
 message CompactLogResponse {
     
 }
-
-message NotLeader {
-    optional uint64    id     = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
-    optional meta.Peer leader = 2 [(gogoproto.nullable) = false];
-}
-
-message StoreNotMatch {}
-
-message ServerIsBusy {}
-
-message StaleCommand {}
-
-message DBNotFound {
-    optional uint64 id = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
-}
-
-message StaleEpoch {
-    repeated meta.VectorDB newDBs = 1 [(gogoproto.nullable) = false];
-}
-
-message RaftEntryTooLarge {
-    optional uint64 id        = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
-    optional uint64 entrySize = 2 [(gogoproto.nullable) = false];
-}
-
-message Error {
-    optional string            message           = 1 [(gogoproto.nullable) = false];
-    optional NotLeader         notLeader         = 2;
-    optional DBNotFound        dbNotFound        = 3;
-    optional StaleEpoch        staleEpoch        = 4;
-    optional ServerIsBusy      serverIsBusy      = 5;
-    optional StaleCommand      staleCommand      = 6;
-    optional StoreNotMatch     storeNotMatch     = 7;
-    optional RaftEntryTooLarge raftEntryTooLarge = 8;
-}

@@ -140,6 +140,13 @@ func WithRaftLogCompactDuration(value time.Duration) Option {
 	}
 }
 
+// WithRaftCheckSplitDuration set RaftCheckSplitDuration
+func WithRaftCheckSplitDuration(value time.Duration) Option {
+	return func(opts *options) {
+		opts.cfg.RaftCheckSplitDuration = value
+	}
+}
+
 // WithSyncWrite set SyncWrite
 func WithSyncWrite(value bool) Option {
 	return func(opts *options) {

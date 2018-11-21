@@ -1,6 +1,7 @@
 syntax = "proto2";
 package rpc;
 
+import "pb/meta/pb.proto";
 import "gogoproto/gogo.proto";
 
 option (gogoproto.marshaler_all) = true;
@@ -26,14 +27,16 @@ message SearchRequest {
     optional uint64 db      = 2 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
     repeated float  xq      = 3;
     optional int64  offset  = 4 [(gogoproto.nullable) = false];
+    optional bool   last    = 5 [(gogoproto.nullable) = false];
 }
 
 // SearchResponse search response
 message SearchResponse {
-    optional bytes  id        = 1 [(gogoproto.customname) = "ID"];
-    repeated float  distances = 2;
-    repeated int64  xids      = 3;
-    optional uint64 db        = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+    optional bytes  id         = 1 [(gogoproto.customname) = "ID"];
+    repeated float  distances  = 2;
+    repeated int64  xids       = 3;
+    optional uint64 db         = 4 [(gogoproto.nullable) = false, (gogoproto.customname) = "DB"];
+    optional bool   searchNext = 5 [(gogoproto.nullable) = false];
 }
 
 // InsertRequest insert request
@@ -64,6 +67,37 @@ message UpdateResponse {
 
 // ErrResponse error response
 message ErrResponse {
-    optional bytes id    = 1 [(gogoproto.customname) = "ID"];
-    optional bytes error = 2;
+    optional bytes             id                = 1 [(gogoproto.customname) = "ID"];
+    optional string            message           = 2 [(gogoproto.nullable) = false];
+    optional NotLeader         notLeader         = 3;
+    optional DBNotFound        dbNotFound        = 4 [(gogoproto.customname) = "DBNotFound"];
+    optional StaleEpoch        staleEpoch        = 5;
+    optional ServerIsBusy      serverIsBusy      = 6;
+    optional StaleCommand      staleCommand      = 7;
+    optional StoreNotMatch     storeNotMatch     = 8;
+    optional RaftEntryTooLarge raftEntryTooLarge = 9;
+}
+
+message NotLeader {
+    optional uint64    id     = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional meta.Peer leader = 2 [(gogoproto.nullable) = false];
+}
+
+message StoreNotMatch {}
+
+message ServerIsBusy {}
+
+message StaleCommand {}
+
+message DBNotFound {
+    optional uint64 id = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+}
+
+message StaleEpoch {
+    repeated meta.VectorDB newDBs = 1 [(gogoproto.nullable) = false];
+}
+
+message RaftEntryTooLarge {
+    optional uint64 id        = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID"];
+    optional uint64 entrySize = 2 [(gogoproto.nullable) = false];
 }

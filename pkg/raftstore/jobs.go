@@ -76,12 +76,16 @@ func (pr *PeerReplicate) startCompactRaftLogJob(id, startIndex, endIndex uint64)
 	return err
 }
 
-func (pr *PeerReplicate) startAskSplitJob(db meta.VectorDB, committedOffset, committedIndex int64) error {
+func (pr *PeerReplicate) startAskSplitJob(db meta.VectorDB, committedOffset, committedIndex int64) {
 	err := pr.store.addSplitJob(func() error {
 		return pr.doAskSplit(db, committedOffset, committedIndex)
 	})
 
-	return err
+	if err != nil {
+		log.Fatalf("raftstore[db-%d]: add ask split job failed, errors: %+v",
+			pr.id,
+			err)
+	}
 }
 
 func (pr *PeerReplicate) doRegistrationJob(delegate *applyDelegate) error {
@@ -105,7 +109,7 @@ func (pr *PeerReplicate) doRegistrationJob(delegate *applyDelegate) error {
 func (pr *PeerReplicate) doProposeJob(c *cmd, isConfChange bool) error {
 	value, ok := pr.store.delegates.Load(pr.id)
 	if !ok {
-		c.respError(errorDBNotFound(pr.id))
+		c.respError(errorDBNotFound(nil, pr.id))
 		return nil
 	}
 
@@ -245,6 +249,7 @@ func (pr *PeerReplicate) doApplySnapJob() error {
 			err)
 	}
 	pr.ps.vectorRecords = records
+	pr.cond.Broadcast()
 
 	log.Infof("raftstore[db-%d]: apply snap complete", pr.id)
 
@@ -350,6 +355,7 @@ func (pr *PeerReplicate) doAskSplit(db meta.VectorDB, committedOffset, committed
 		log.Errorf("raftstore-split[db-%d]: ask split to pd failed, error:\n %+v",
 			db.ID,
 			err)
+		pr.alreadySplit = false
 		return err
 	}
 
@@ -359,11 +365,14 @@ func (pr *PeerReplicate) doAskSplit(db meta.VectorDB, committedOffset, committed
 	splitReq.CommittedOffset = committedOffset
 	splitReq.CommittedIndex = committedIndex
 
-	pr.onAdmin(&raftpb.AdminRequest{
+	cb := func(err interface{}) {
+		pr.alreadySplit = false
+	}
+
+	return pr.onAdminWithCB(&raftpb.AdminRequest{
 		Type:  raftpb.Split,
 		Split: splitReq,
-	})
-	return nil
+	}, cb)
 }
 
 func (s *Store) addProphetJob(task func() error, cb func(*task.Job)) error {

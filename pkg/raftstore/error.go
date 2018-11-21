@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/infinivision/hyena/pkg/pb/meta"
-	raftpb "github.com/infinivision/hyena/pkg/pb/raft"
+	rpcpb "github.com/infinivision/hyena/pkg/pb/rpc"
 )
 
 var (
@@ -16,48 +16,60 @@ var (
 	errLargeRaftEntrySize = errors.New("entry is too large")
 	errStoreNotMatch      = errors.New("key not in store")
 
-	infoStaleCMD  = new(raftpb.StaleCommand)
-	storeNotMatch = new(raftpb.StoreNotMatch)
+	infoStaleCMD  = new(rpcpb.StaleCommand)
+	storeNotMatch = new(rpcpb.StoreNotMatch)
 )
 
-func errorBaseResp() *raftpb.Error {
-	return &raftpb.Error{}
+func copyWithID(uuid []byte, source *rpcpb.ErrResponse) *rpcpb.ErrResponse {
+	value := &rpcpb.ErrResponse{}
+	*value = *source
+	value.ID = uuid
+
+	return value
 }
 
-func errorDBNotFound(id uint64) *raftpb.Error {
-	return &raftpb.Error{
-		Message: errDBNotFound.Error(),
-		DbNotFound: &raftpb.DBNotFound{
-			ID: id,
-		},
+func errorBaseResp(uuid []byte) *rpcpb.ErrResponse {
+	return &rpcpb.ErrResponse{
+		ID: uuid,
 	}
 }
 
-func errorStoreNotMatch() *raftpb.Error {
-	return &raftpb.Error{
-		Message:       errStoreNotMatch.Error(),
-		StoreNotMatch: storeNotMatch,
+func errorDBNotFound(uuid []byte, id uint64) *rpcpb.ErrResponse {
+	errRsp := errorBaseResp(uuid)
+	errRsp.Message = errDBNotFound.Error()
+	errRsp.DBNotFound = &rpcpb.DBNotFound{
+		ID: id,
 	}
+
+	return errRsp
 }
 
-func errorOtherCMDResp(err error) *raftpb.Error {
-	errRsp := errorBaseResp()
+func errorStoreNotMatch(uuid []byte) *rpcpb.ErrResponse {
+	errRsp := errorBaseResp(uuid)
+	errRsp.Message = errStoreNotMatch.Error()
+	errRsp.StoreNotMatch = storeNotMatch
+
+	return errRsp
+}
+
+func errorOtherCMDResp(uuid []byte, err error) *rpcpb.ErrResponse {
+	errRsp := errorBaseResp(uuid)
 	errRsp.Message = err.Error()
 	return errRsp
 }
 
-func errorStaleCMDResp() *raftpb.Error {
-	resp := errorBaseResp()
+func errorStaleCMDResp(uuid []byte) *rpcpb.ErrResponse {
+	resp := errorBaseResp(uuid)
 	resp.Message = errStaleCMD.Error()
 	resp.StaleCommand = infoStaleCMD
 
 	return resp
 }
 
-func errorNotLeader(id uint64, leader *meta.Peer) *raftpb.Error {
-	resp := errorBaseResp()
+func errorNotLeader(uuid []byte, id uint64, leader *meta.Peer) *rpcpb.ErrResponse {
+	resp := errorBaseResp(uuid)
 	resp.Message = errNotLeader.Error()
-	resp.NotLeader = &raftpb.NotLeader{
+	resp.NotLeader = &rpcpb.NotLeader{
 		ID: id,
 	}
 	if leader != nil {
@@ -67,10 +79,10 @@ func errorNotLeader(id uint64, leader *meta.Peer) *raftpb.Error {
 	return resp
 }
 
-func errorLargeRaftEntrySize(id uint64, size uint64) *raftpb.Error {
-	resp := errorBaseResp()
+func errorLargeRaftEntrySize(uuid []byte, id uint64, size uint64) *rpcpb.ErrResponse {
+	resp := errorBaseResp(uuid)
 	resp.Message = errLargeRaftEntrySize.Error()
-	resp.RaftEntryTooLarge = &raftpb.RaftEntryTooLarge{
+	resp.RaftEntryTooLarge = &rpcpb.RaftEntryTooLarge{
 		ID:        id,
 		EntrySize: size,
 	}
@@ -78,10 +90,10 @@ func errorLargeRaftEntrySize(id uint64, size uint64) *raftpb.Error {
 	return resp
 }
 
-func errorStaleEpochResp(newDBs ...meta.VectorDB) *raftpb.Error {
-	resp := errorBaseResp()
+func errorStaleEpochResp(uuid []byte, newDBs ...meta.VectorDB) *rpcpb.ErrResponse {
+	resp := errorBaseResp(uuid)
 	resp.Message = errStaleCMD.Error()
-	resp.StaleEpoch = &raftpb.StaleEpoch{
+	resp.StaleEpoch = &rpcpb.StaleEpoch{
 		NewDBs: newDBs,
 	}
 
