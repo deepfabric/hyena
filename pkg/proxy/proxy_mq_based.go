@@ -117,7 +117,7 @@ func (p *mqBasedProxy) doPublish(req interface{}, size int) error {
 	}
 
 	p.resetOffset(offset)
-	log.Infof("topic %s published %d bytes with offset %d",
+	log.Debugf("topic %s published %d bytes with offset %d",
 		p.topic,
 		n,
 		p.getOffset())
