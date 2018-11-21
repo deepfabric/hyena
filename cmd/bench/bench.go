@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	con           = flag.Int64("c", 0, "The clients.")
+	con           = flag.Int64("c", 1, "The clients.")
 	cn            = flag.Int64("cn", 64, "The concurrency per client.")
 	dim           = flag.Int64("dim", 128, "dim")
 	num           = flag.Int64("n", 0, "The total number.")
