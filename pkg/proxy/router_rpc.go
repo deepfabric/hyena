@@ -73,7 +73,7 @@ func (ctx *asyncContext) reset() {
 func (r *router) addAsyncCtx(ctx *asyncContext, req *rpc.SearchRequest) {
 	id := key(req.ID)
 	r.ctxs.Store(id, ctx)
-	r.ctxs.Store(id, req)
+	r.requests.Store(id, req)
 
 	util.DefaultTimeoutWheel().Schedule(r.timeout, r.cleanTimeout, id)
 }
@@ -99,10 +99,11 @@ func (r *router) search(req *rpc.SearchRequest) (uint64, []float32, []int64, err
 	r.foreach(func(db *meta.VectorDB, max bool) {
 		ctx.to++
 		bReq := &rpc.SearchRequest{
-			ID:   uuid.NewV4().Bytes(),
-			DB:   db.ID,
-			Xq:   req.Xq,
-			Last: max,
+			ID:     uuid.NewV4().Bytes(),
+			DB:     db.ID,
+			Xq:     req.Xq,
+			Offset: req.Offset,
+			Last:   max,
 		}
 		r.addAsyncCtx(ctx, bReq)
 		r.send(db, bReq)

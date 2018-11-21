@@ -26,6 +26,7 @@ type mqBasedProxy struct {
 // NewMQBasedProxy return a Proxy based on mq
 func NewMQBasedProxy(topic string, addrs []string, prophetAddrs []string, opts ...Option) (Proxy, error) {
 	p := new(mqBasedProxy)
+	p.committedOffset = -3
 	p.topic = topic
 	p.addrs = addrs
 	p.prophetAddrs = prophetAddrs

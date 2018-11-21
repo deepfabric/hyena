@@ -20,7 +20,7 @@ var (
 	num           = flag.Int64("n", 0, "The total number.")
 	timeout       = flag.Int("timeout", 200, "timeout ms")
 	addrs         = flag.String("addrs", "172.19.0.107:9092", "mq addr.")
-	prophetsAddrs = flag.String("addrs-prophet", "172.19.0.101:9529,172.19.0.103:9529,172.19.0.104:9529", "The prophet address.")
+	prophetsAddrs = flag.String("addrs-prophet", "127.0.0.1:19529,127.0.0.1:29529,127.0.0.1:39529", "The prophet address.")
 )
 
 func main() {
