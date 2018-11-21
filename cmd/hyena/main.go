@@ -233,16 +233,7 @@ func parseOptions() []server.Option {
 		embedEtcdCfg.URLsPeer = *prophetURLsPeer
 		opts = append(opts, server.WithRaftOption(raftstore.WithProphetOption(prophet.WithEmbeddedEtcd(strings.Split(*prophetClientAddrs, ","), embedEtcdCfg))))
 	} else {
-		var endpoints []string
-		if *prophetURLsAdvertiseClient != "" {
-			endpoints = strings.Split(*prophetURLsAdvertiseClient, ",")
-		} else if *prophetURLsClient != "" {
-			endpoints = strings.Split(*prophetURLsClient, ",")
-		} else {
-			fmt.Println("if is not storage prophet node, prophet-urls-client or prophet-urls-advertise-client must be set")
-			os.Exit(-1)
-		}
-
+		endpoints := strings.Split(*prophetClientAddrs, ",")
 		client, err := clientv3.New(clientv3.Config{
 			Endpoints:   endpoints,
 			DialTimeout: prophet.DefaultTimeout,
