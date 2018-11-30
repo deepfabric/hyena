@@ -38,7 +38,7 @@ func WithSearchTimeout(timeout time.Duration) Option {
 
 // Proxy is proxy for versiondb
 type Proxy interface {
-	UpdateWithIds(db uint64, extXb []float32, extXids []int64) error
+	UpdateWithIds(db uint64, extXid int64, extXb []float32) error
 	AddWithIds(newXb []float32, newXids []int64) error
-	Search(xq []float32) (uint64, []float32, []int64, error)
+	Search(xq []float32) ([]uint64, []float32, []int64, error)
 }

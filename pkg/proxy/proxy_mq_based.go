@@ -69,12 +69,12 @@ func (p *mqBasedProxy) initProducer() error {
 	return nil
 }
 
-func (p *mqBasedProxy) UpdateWithIds(db uint64, extXb []float32, extXids []int64) error {
+func (p *mqBasedProxy) UpdateWithIds(db uint64, extXid int64, extXb []float32) error {
 	req := &rpc.UpdateRequest{
 		DB:  db,
 		Xbs: extXb,
-		Ids: extXids,
 	}
+	req.Ids = append(req.Ids, extXid)
 
 	return p.doPublish(req, req.Size())
 }
@@ -88,14 +88,14 @@ func (p *mqBasedProxy) AddWithIds(newXb []float32, newXids []int64) error {
 	return p.doPublish(req, req.Size())
 }
 
-func (p *mqBasedProxy) Search(xq []float32) (uint64, []float32, []int64, error) {
+func (p *mqBasedProxy) Search(xq []float32) ([]uint64, []float32, []int64, error) {
 	req := acquireRequest()
 	req.Offset = p.getOffset()
 	req.Xq = xq
 
-	db, ds, ids, err := p.router.search(req)
+	dbs, ds, ids, err := p.router.search(req)
 	releaseRequest(req)
-	return db, ds, ids, err
+	return dbs, ds, ids, err
 }
 
 func (p *mqBasedProxy) doPublish(req interface{}, size int) error {

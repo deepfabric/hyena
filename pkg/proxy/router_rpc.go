@@ -24,7 +24,7 @@ type asyncContext struct {
 	wait         uint64
 	completeC    chan struct{}
 	to, received uint64
-	db           uint64
+	dbs          []uint64
 	distances    []float32
 	ids          []int64
 }
@@ -36,7 +36,7 @@ func (ctx *asyncContext) done(id interface{}, rsp *rpc.SearchResponse) {
 			if value != -1 && betterThan(rsp.Distances[idx], ctx.distances[idx]) {
 				ctx.distances[idx] = rsp.Distances[idx]
 				ctx.ids[idx] = value
-				ctx.db = rsp.DB
+				ctx.dbs[idx] = rsp.DB
 			}
 		}
 		ctx.Unlock()
@@ -48,16 +48,16 @@ func (ctx *asyncContext) done(id interface{}, rsp *rpc.SearchResponse) {
 	}
 }
 
-func (ctx *asyncContext) get(timeout time.Duration) (uint64, []float32, []int64, error) {
+func (ctx *asyncContext) get(timeout time.Duration) ([]uint64, []float32, []int64, error) {
 	timeoutCtx, cancel := context.WithTimeout(context.TODO(), timeout)
 
 	select {
 	case <-ctx.completeC:
 		cancel()
-		return ctx.db, ctx.distances, ctx.ids, nil
+		return ctx.dbs, ctx.distances, ctx.ids, nil
 	case <-timeoutCtx.Done():
 		cancel()
-		return ctx.db, ctx.distances, ctx.ids, ErrTimeout
+		return ctx.dbs, ctx.distances, ctx.ids, ErrTimeout
 	}
 }
 
@@ -83,15 +83,16 @@ func (r *router) cleanTimeout(id interface{}) {
 	r.requests.Delete(id)
 }
 
-func (r *router) search(req *rpc.SearchRequest) (uint64, []float32, []int64, error) {
+func (r *router) search(req *rpc.SearchRequest) ([]uint64, []float32, []int64, error) {
 	ctx := acquireCtx()
 
 	l := len(req.Xq) / r.dim
 	ctx.completeC = make(chan struct{}, 1)
-	ctx.db = 0
 	ctx.distances = make([]float32, l, l)
 	ctx.ids = make([]int64, l, l)
+	ctx.dbs = make([]uint64, l, l)
 	for i := 0; i < l; i++ {
+		ctx.dbs[i] = 0
 		ctx.distances[i] = 0.0
 		ctx.ids[i] = -1
 	}
@@ -109,9 +110,9 @@ func (r *router) search(req *rpc.SearchRequest) (uint64, []float32, []int64, err
 		r.send(db, bReq)
 	})
 
-	db, ds, ids, err := ctx.get(r.timeout)
+	dbs, ds, ids, err := ctx.get(r.timeout)
 	releaseCtx(ctx)
-	return db, ds, ids, err
+	return dbs, ds, ids, err
 }
 
 func (r *router) onResponse(msg interface{}) {
