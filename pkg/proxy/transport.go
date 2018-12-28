@@ -52,11 +52,13 @@ func (t *transport) stopped() bool {
 
 func (t *transport) call(items []interface{}, n int64) error {
 	for i := int64(0); i < n; i++ {
+		log.Debugf("%+v sent", items[i])
 		t.conn.Write(items[i])
 	}
 
 	err := t.conn.Flush()
 	if err != nil {
+		log.Debugf("search sent failed: %+v", err)
 		return err
 	}
 
@@ -76,6 +78,14 @@ func (t *transport) call(items []interface{}, n int64) error {
 }
 
 func (t *transport) loop() {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("transport to %s crashed %+v",
+				t.addr,
+				err)
+		}
+	}()
+
 	items := make([]interface{}, batch, batch)
 
 OUTER:
