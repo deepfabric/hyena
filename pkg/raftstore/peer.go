@@ -359,6 +359,12 @@ func (pr *PeerReplicate) waitInsertCommitted(req *rpc.SearchRequest) bool {
 			offset, index := pr.ps.committedOffset()
 			requestOffsetIsBigger := req.Offset > offset || (req.Offset == offset && index != indexComplete)
 
+			log.Debugf("raftstore[db-%d]: search with offset %d, current offset %d index %d",
+				req.DB,
+				req.Offset,
+				offset,
+				index)
+
 			// this db is not writable, if the request offset is bigger than the lastest committed offset,
 			// the client need search the new writable range
 			if pr.ps.availableWriteRecords() <= 0 &&

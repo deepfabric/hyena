@@ -30,6 +30,7 @@ func (s *Store) HandleSearch(req *rpc.SearchRequest, cb func(interface{})) {
 		cb(errorOtherCMDResp(req.ID, err))
 		return
 	}
+	log.Debugf("raftstore[db-%d]: search with offset %d added to queue", req.DB, req.Offset)
 }
 
 // HandleInsert handle insert request

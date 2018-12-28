@@ -52,7 +52,6 @@ func (t *transport) stopped() bool {
 
 func (t *transport) call(items []interface{}, n int64) error {
 	for i := int64(0); i < n; i++ {
-		log.Debugf("%+v sent", items[i])
 		t.conn.Write(items[i])
 	}
 
