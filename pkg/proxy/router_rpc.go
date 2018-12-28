@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fagongzi/log"
 	"github.com/fagongzi/util/hack"
 	"github.com/fagongzi/util/uuid"
 	"github.com/infinivision/hyena/pkg/pb/meta"
@@ -106,9 +107,17 @@ func (r *router) search(req *rpc.SearchRequest) ([]uint64, []float32, []int64, e
 			Offset: req.Offset,
 			Last:   max,
 		}
+		log.Debugf("search[%s] with %d offset to db %d",
+			bReq.ID,
+			bReq.Offset,
+			db.ID)
 		r.addAsyncCtx(ctx, bReq)
 		r.send(db, bReq)
 	})
+
+	log.Debugf("search with %d offset to %d dbs",
+		req.Offset,
+		ctx.to)
 
 	dbs, ds, ids, err := ctx.get(r.timeout)
 	releaseCtx(ctx)
@@ -116,6 +125,8 @@ func (r *router) search(req *rpc.SearchRequest) ([]uint64, []float32, []int64, e
 }
 
 func (r *router) onResponse(msg interface{}) {
+	log.Debugf("received search response %+v", msg)
+
 	if rsp, ok := msg.(*rpc.SearchResponse); ok {
 		id := key(rsp.ID)
 		if value, ok := r.ctxs.Load(id); ok {
