@@ -130,6 +130,9 @@ func (pr *PeerReplicate) execSearch(req *rpc.SearchRequest, cb func(interface{})
 	rsp.Xids = ids
 	rsp.DB = pr.id
 	rsp.SearchNext = searchNext
+	log.Debugf("raftstore[db-%d]: handle search result %+v",
+		pr.id,
+		rsp)
 	cb(rsp)
 }
 

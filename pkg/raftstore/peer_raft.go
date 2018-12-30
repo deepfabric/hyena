@@ -462,6 +462,11 @@ func (pr *PeerReplicate) handleRequestFromMQ(items []interface{}) {
 	}
 
 	pr.ps.vectorRecords += uint64(len(vBatch.ids))
+
+	log.Debugf("raftstore[db-%d]: add vectordb records: xbs %+v, ids: %+v",
+		pr.id,
+		vBatch.xbs,
+		vBatch.ids)
 	err = pr.ps.vdb.AddWithIds(vBatch.xbs, vBatch.ids)
 	if err != nil {
 		log.Fatalf("raftstore[db-%d]: batch insert failed, errors:%+v",
