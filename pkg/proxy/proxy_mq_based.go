@@ -76,7 +76,7 @@ func (p *mqBasedProxy) UpdateWithIds(db uint64, extXid int64, extXb []float32) e
 	}
 	req.Ids = append(req.Ids, extXid)
 
-	return p.doPublish(req, req.Size())
+	return p.doPublish(req, req.Size(), false)
 }
 
 func (p *mqBasedProxy) AddWithIds(newXb []float32, newXids []int64) error {
@@ -85,7 +85,7 @@ func (p *mqBasedProxy) AddWithIds(newXb []float32, newXids []int64) error {
 		Ids: newXids,
 	}
 
-	return p.doPublish(req, req.Size())
+	return p.doPublish(req, req.Size(), true)
 }
 
 func (p *mqBasedProxy) Search(xq []float32) ([]uint64, []float32, []int64, error) {
@@ -98,7 +98,7 @@ func (p *mqBasedProxy) Search(xq []float32) ([]uint64, []float32, []int64, error
 	return dbs, ds, ids, err
 }
 
-func (p *mqBasedProxy) doPublish(req interface{}, size int) error {
+func (p *mqBasedProxy) doPublish(req interface{}, size int, refreshOffset bool) error {
 	buf := goetty.NewByteBuf(size + 5)
 	err := codec.GetEncoder().Encode(req, buf)
 	if err != nil {
@@ -116,7 +116,9 @@ func (p *mqBasedProxy) doPublish(req interface{}, size int) error {
 		return err
 	}
 
-	p.resetOffset(offset)
+	if refreshOffset {
+		p.resetOffset(offset)
+	}
 	log.Debugf("topic %s published %d bytes with offset %d",
 		p.topic,
 		n,
