@@ -1,0 +1,4 @@
+FROM deepfabric/centos
+
+# boost-thread boost-system boost-filesystem glog gflags openblas jemalloc
+RUN yum -y install gcc-c++ openblas-devel swig python-devel numpy glog-devel gflags-devel boost-devel jemalloc-devel
