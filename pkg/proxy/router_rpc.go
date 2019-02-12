@@ -107,9 +107,10 @@ func (r *router) search(req *rpc.SearchRequest) ([]uint64, []float32, []int64, e
 			Offset: req.Offset,
 			Last:   max,
 		}
-		log.Debugf("search[%v] with %d offset to db %d",
+		log.Debugf("search[%v] with %d offset and %d xqs to db %d",
 			bReq.ID,
 			bReq.Offset,
+			len(req.Xq),
 			db.ID)
 		r.addAsyncCtx(ctx, bReq)
 		r.send(db, bReq)
