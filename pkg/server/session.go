@@ -61,6 +61,9 @@ func (s *session) writeLoop(stopC chan struct{}) {
 				return
 			}
 			s.conn.Write(items[i])
+			log.Debugf("session-[%v]: responsed with %+v",
+				s.id,
+				items[i])
 		}
 		s.conn.Flush()
 	}
