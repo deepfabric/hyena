@@ -1,13 +1,27 @@
 package raftstore
 
 import (
+	"fmt"
+
 	"github.com/fagongzi/log"
 	"github.com/infinivision/hyena/pkg/pb/rpc"
 )
 
 // HandleSearch handle search request
 func (s *Store) HandleSearch(req *rpc.SearchRequest, cb func(interface{})) {
-	log.Debugf("raftstore[db-%d]: search with offset %d", req.DB, req.Offset)
+	log.Debugf("raftstore[db-%d]: search with offset %d",
+		req.DB,
+		req.Offset)
+
+	if len(req.Xq) != s.cfg.Dim {
+		log.Errorf("raftstore[db-%d]: search with %d dim, expect %d",
+			req.DB,
+			len(req.Xq),
+			s.cfg.Dim)
+		cb(errorOtherCMDResp(req.ID,
+			fmt.Errorf("invalid %d dim, expect %d", len(req.Xq), s.cfg.Dim)))
+		return
+	}
 
 	pr := s.getDB(req.DB, false)
 	if nil == pr {
