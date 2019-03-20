@@ -1320,7 +1320,7 @@ func (s *Store) doApplySplit(id uint64, result *splitResult) {
 		// there is probably a bug.
 		log.Fatalf("raftstore[db-%d]: create new split db failed, newDB=<%d> errors:\n %+v",
 			id,
-			newDB,
+			newDB.ID,
 			err)
 	}
 
