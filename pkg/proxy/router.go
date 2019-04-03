@@ -222,7 +222,6 @@ func (r *router) updateAll(evt *prophet.EventNotify) {
 	r.Lock()
 	r.stores = make(map[uint64]*meta.Store)
 	r.dbs = make(map[uint64]*meta.VectorDB)
-	r.leaders = make(map[uint64]uint64)
 	r.maxDB = 0
 
 	dbF := func(data []byte, leader uint64) {
