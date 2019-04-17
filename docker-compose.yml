@@ -1,0 +1,75 @@
+version: '2.1'
+services:
+  zookeeper:
+    image: wurstmeister/zookeeper
+  kafka:
+    image: wurstmeister/kafka:2.11-0.11.0.2
+    depends_on: 
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "hyena:1:1"
+
+  hyena1:
+    image: infinivision/hyena
+    depends_on: 
+      - kafka
+    command:
+      - --addr=hyena1:9527
+      - --addr-raft=hyena1:9528
+      - --prophet-name=p1
+      - --prophet-addr=hyena1:9529
+      - --prophet-addr-client=http://hyena1:2371,http://hyena2:2371,http://hyena3:2371
+      - --prophet-urls-client=http://0.0.0.0:2371
+      - --prophet-urls-advertise-client=http://hyena1:2371
+      - --prophet-urls-peer=http://0.0.0.0:2381
+      - --prophet-urls-advertise-peer=http://hyena1:2381
+      - --prophet-initial-cluster=p1=http://hyena1:2381,p2=http://hyena2:2381,p3=http://hyena3:2381
+      - --prophet-storage=true
+      - --rack=rack-1
+      - --mq-addr=kafka:9092 
+      - --mq-topic=hyena 
+      - --mq-group=hyena
+
+  hyena2:
+    image: infinivision/hyena
+    depends_on: 
+      - kafka
+    command:
+      - --addr=hyena2:9527
+      - --addr-raft=hyena2:9528
+      - --prophet-name=p2
+      - --prophet-addr=hyena2:9529
+      - --prophet-addr-client=http://hyena1:2371,http://hyena2:2371,http://hyena3:2371
+      - --prophet-urls-client=http://0.0.0.0:2371
+      - --prophet-urls-advertise-client=http://hyena2:2371
+      - --prophet-urls-peer=http://0.0.0.0:2381
+      - --prophet-urls-advertise-peer=http://hyena2:2381
+      - --prophet-initial-cluster=p1=http://hyena1:2381,p2=http://hyena2:2381,p3=http://hyena3:2381
+      - --prophet-storage=true
+      - --rack=rack-2
+      - --mq-addr=kafka:9092 
+      - --mq-topic=hyena 
+      - --mq-group=hyena
+  
+  hyena3:
+    image: infinivision/hyena
+    depends_on: 
+      - kafka
+    command:
+      - --addr=hyena3:9527
+      - --addr-raft=hyena3:9528
+      - --prophet-name=p3
+      - --prophet-addr=hyena3:9529
+      - --prophet-addr-client=http://hyena1:2371,http://hyena2:2371,http://hyena3:2371
+      - --prophet-urls-client=http://0.0.0.0:2371
+      - --prophet-urls-advertise-client=http://hyena3:2371
+      - --prophet-urls-peer=http://0.0.0.0:2381
+      - --prophet-urls-advertise-peer=http://hyena3:2381
+      - --prophet-initial-cluster=p1=http://hyena1:2381,p2=http://hyena2:2381,p3=http://hyena3:2381
+      - --prophet-storage=true
+      - --rack=rack-3
+      - --mq-addr=kafka:9092 
+      - --mq-topic=hyena 
+      - --mq-group=hyena

@@ -38,3 +38,7 @@ ignored = ["github.com/deepfabric/c-nemo", "github.com/deepfabric/go-nemo", "git
 [[constraint]]
   name = "github.com/shirou/gopsutil"
   version = "2.18.5"
+
+[[constraint]]
+  name = "github.com/fagongzi/util"
+  version = "0.1.0"

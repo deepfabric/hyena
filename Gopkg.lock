@@ -199,12 +199,12 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:612bf1e995acc09402b8af081de41e64a5484d8281a0f60fdb5d2f7ac609a09d"
+  digest = "1:9d2447c1c7d08e52a4869142b2591d6e9c7eb3c5e479627277ca559ebc4c3a6f"
   name = "github.com/fagongzi/goetty"
   packages = ["."]
   pruneopts = "UT"
-  revision = "fbef9f636e216d4001087a9ca723631ab9cd072f"
-  version = "v1.1.5"
+  revision = "9c0ea50f5d40d5b21b6deb1dbad854e9ebc77100"
+  version = "v1.3.0"
 
 [[projects]]
   branch = "master"
@@ -215,10 +215,11 @@
   revision = "9a647df25e0e4ba3d967bd8a16b871e8c7e7eb6c"
 
 [[projects]]
-  digest = "1:ee21a59f1cf10ca91bff38cd428b7fed43255801a92ee1b8922d439393bc7f47"
+  digest = "1:d7cc1e5def736d9658e5aec726837ee7d215e36fa18195c686b6db4480971e99"
   name = "github.com/fagongzi/util"
   packages = [
     "format",
+    "hack",
     "protoc",
     "task",
     "uuid",
@@ -320,11 +321,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:8cd95d415055206568938319e9dc9964b18131fe2a4438001ca50b99892f9392"
+  digest = "1:8350671dd497b81c5f450720d4f238f925afc8cad947033b5ed3e74402b3ba60"
   name = "github.com/infinivision/prophet"
   packages = ["."]
   pruneopts = "UT"
-  revision = "1cbe907ddb976b57a6c242f5f0727de7621dea85"
+  revision = "7a7d29ab8a5e682f3a36c1c5768565ae75bcdc17"
 
 [[projects]]
   digest = "1:75ab90ae3f5d876167e60f493beadfe66f0ed861a710f283fb06c86437a09538"
@@ -599,6 +600,7 @@
     "github.com/deepfabric/storage",
     "github.com/fagongzi/goetty",
     "github.com/fagongzi/log",
+    "github.com/fagongzi/util/hack",
     "github.com/fagongzi/util/protoc",
     "github.com/fagongzi/util/task",
     "github.com/fagongzi/util/uuid",

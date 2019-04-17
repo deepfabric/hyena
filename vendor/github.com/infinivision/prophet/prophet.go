@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/etcd/clientv3"
+
 	"github.com/fagongzi/goetty"
 )
 
@@ -37,6 +39,7 @@ type Adapter interface {
 type Prophet struct {
 	sync.Mutex
 	adapter     Adapter
+	opts        *options
 	cfg         *Cfg
 	store       Store
 	rt          *Runtime
@@ -64,6 +67,7 @@ func NewProphet(name string, addr string, adapter Adapter, opts ...Option) *Prop
 	value.adjust()
 
 	p := new(Prophet)
+	p.opts = value
 	p.cfg = value.cfg
 	p.adapter = adapter
 	p.bizCodec = &codec{adapter: adapter}
@@ -102,4 +106,9 @@ func (p *Prophet) GetStore() Store {
 // GetRPC returns the rpc interface
 func (p *Prophet) GetRPC() RPC {
 	return p.rpc
+}
+
+// GetEtcdClient return etcd client for reuse
+func (p *Prophet) GetEtcdClient() *clientv3.Client {
+	return p.opts.client
 }

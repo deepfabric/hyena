@@ -8,7 +8,6 @@ RUN yum -y install centos-release-scl  \
      && mkdir -p /root/go/src/github.com/infinivision \
      && git clone https://github.com/infinivision/vectodb.git /root/go/src/github.com/infinivision/vectodb \
      && cd /root/go/src/github.com/infinivision/vectodb \
-     && sed -i 's/GO111MODULE=on/GO111MODULE=off/g' SConstruct \
      && PATH=/opt/rh/devtoolset-7/root/usr/bin:/opt/rh/devtoolset-7/root/usr/bin:$PATH scons \
      && yum group -y install "Development Tools" \
      && go get github.com/funny/slab \
