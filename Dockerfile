@@ -1,11 +1,11 @@
 FROM infinivision/build as builder
 
-COPY . /root/go/src/github.com/infinivision/hyena
-WORKDIR /root/go/src/github.com/infinivision/hyena
+COPY . /opt/app-root/src/go/src/github.com/infinivision/hyena
+WORKDIR /opt/app-root/src/go/src/github.com/infinivision/hyena
 
 RUN make hyena
 
 FROM infinivision/centos
-COPY --from=builder /root/go/src/github.com/infinivision/hyena/dist/hyena /usr/local/bin/hyena
+COPY --from=builder /opt/app-root/src/go/src/github.com/infinivision/hyena/dist/hyena /usr/local/bin/hyena
 
 ENTRYPOINT ["/usr/local/bin/hyena"]

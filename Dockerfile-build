@@ -1,15 +1,13 @@
-FROM infinivision/centos
+FROM infinivision/hyena-build
 
-RUN yum -y install centos-release-scl  \
-     && yum -y install devtoolset-7 \
-     && scl enable devtoolset-7 bash \
-     && yum -y install go \
-     && yum -y install scons \
-     && mkdir -p /root/go/src/github.com/infinivision \
-     && git clone https://github.com/infinivision/vectodb.git /root/go/src/github.com/infinivision/vectodb \
-     && cd /root/go/src/github.com/infinivision/vectodb \
-     && PATH=/opt/rh/devtoolset-7/root/usr/bin:/opt/rh/devtoolset-7/root/usr/bin:$PATH scons \
-     && yum group -y install "Development Tools" \
-     && go get github.com/funny/slab \
+RUN  git clone https://github.com/infinivision/vectodb.git /opt/app-root/src/go/src/github.com/infinivision/vectodb 
+RUN  cd /opt/app-root/src/go/src/github.com/infinivision/vectodb \
+     && GO111MODULE=on go mod download \
+     && GO111MODULE=on go mod vendor 
+RUN  cd /opt/app-root/src/go/src/github.com/infinivision/vectodb \
+     && scons -c \ 
+     && scons \
+     && GO111MODULE=on go install github.com/infinivision/vectodb 
+RUN  go get github.com/funny/slab \
      && go get github.com/deepfabric/c-nemo \
      && go get github.com/deepfabric/go-nemo
