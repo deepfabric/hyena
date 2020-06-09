@@ -2,21 +2,30 @@ version: '2.1'
 services:
   zookeeper:
     image: wurstmeister/zookeeper
+    ports:
+      - "2181:2181"
   kafka:
     image: wurstmeister/kafka:2.11-0.11.0.2
     depends_on: 
       - zookeeper
+    ports:
+      - "9092:9092"
     environment:
       KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_CREATE_TOPICS: "hyena:1:1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   hyena1:
     image: infinivision/hyena
     depends_on: 
       - kafka
+    ports:
+      - "1529:9529"
+      - "1527:1527"
     command:
-      - --addr=hyena1:9527
+      - --addr=hyena1:1527
       - --addr-raft=hyena1:9528
       - --prophet-name=p1
       - --prophet-addr=hyena1:9529
@@ -36,8 +45,11 @@ services:
     image: infinivision/hyena
     depends_on: 
       - kafka
+    ports:
+      - "2529:9529"
+      - "2527:2527"
     command:
-      - --addr=hyena2:9527
+      - --addr=hyena2:2527
       - --addr-raft=hyena2:9528
       - --prophet-name=p2
       - --prophet-addr=hyena2:9529
@@ -57,8 +69,11 @@ services:
     image: infinivision/hyena
     depends_on: 
       - kafka
+    ports:
+      - "3529:9529"
+      - "3527:3527"
     command:
-      - --addr=hyena3:9527
+      - --addr=hyena3:3527
       - --addr-raft=hyena3:9528
       - --prophet-name=p3
       - --prophet-addr=hyena3:9529
